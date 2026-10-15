@@ -27,7 +27,7 @@ export default async function StudentLayout({ children }: Readonly<{ children: R
 
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
-  if (!user) redirect("/login?next=/vote");
+  if (!user) redirect("/login?next=/candidates");
 
   const { data: student } = await supabase
     .from("students")

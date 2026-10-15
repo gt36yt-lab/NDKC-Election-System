@@ -38,7 +38,7 @@ export default function LoginForm() {
     }
 
     const nextPath = searchParams.get("next");
-    router.replace(nextPath?.startsWith("/") && !nextPath.startsWith("//") ? nextPath : "/vote");
+    router.replace(nextPath?.startsWith("/") && !nextPath.startsWith("//") ? nextPath : "/candidates");
     router.refresh();
   }
 

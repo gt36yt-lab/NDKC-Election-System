@@ -35,6 +35,7 @@ export default function AdminDashboard({ initialStudents, initialCandidates, ini
   const [activeTab, setActiveTab] = useState<"students" | "candidates">("students");
   const [gradeFilter, setGradeFilter] = useState("all");
   const [sectionFilter, setSectionFilter] = useState("all");
+  const [votingStatusFilter, setVotingStatusFilter] = useState("all");
   const totalVoters = students.length;
   const votedCount = students.filter((student) => student.has_voted).length;
   const turnout = totalVoters === 0 ? 0 : Math.round((votedCount / totalVoters) * 100);
@@ -45,12 +46,13 @@ export default function AdminDashboard({ initialStudents, initialCandidates, ini
   const filteredStudents = useMemo(() => {
     const normalizedQuery = query.trim().toLowerCase();
     return students.filter((student) => {
-      const matchesQuery = !normalizedQuery || [student.lrn, student.full_name].some((value) => value.toLowerCase().includes(normalizedQuery));
+      const matchesQuery = !normalizedQuery || [student.lrn, student.full_name, String(student.grade_level), student.section?.trim() || "General"].some((value) => value.toLowerCase().includes(normalizedQuery));
       const matchesGrade = gradeFilter === "all" || String(student.grade_level) === gradeFilter;
       const matchesSection = sectionFilter === "all" || (student.section?.trim() || "General") === sectionFilter;
-      return matchesQuery && matchesGrade && matchesSection;
+      const matchesVotingStatus = votingStatusFilter === "all" || student.has_voted === (votingStatusFilter === "voted");
+      return matchesQuery && matchesGrade && matchesSection && matchesVotingStatus;
     });
-  }, [gradeFilter, query, sectionFilter, students]);
+  }, [gradeFilter, query, sectionFilter, students, votingStatusFilter]);
 
   async function resetOtp(student: AdminStudent) {
     if (student.has_voted || resettingId) return;
@@ -132,6 +134,12 @@ export default function AdminDashboard({ initialStudents, initialCandidates, ini
           <select id="student-section-filter" value={sectionFilter} onChange={(event) => setSectionFilter(event.target.value)} className="h-10 min-w-40 border border-[#cfd8d1] bg-white px-3 text-sm">
             <option value="all">All Sections</option>
             {sections.map((section) => <option key={section} value={section}>{section}</option>)}
+          </select>
+          <label htmlFor="student-voting-status-filter" className="text-xs font-semibold text-[#4e5b53]">Voting status</label>
+          <select id="student-voting-status-filter" value={votingStatusFilter} onChange={(event) => setVotingStatusFilter(event.target.value)} className="h-10 border border-[#cfd8d1] bg-white px-3 text-sm">
+            <option value="all">All Statuses</option>
+            <option value="voted">Voted</option>
+            <option value="not-voted">Not Voted</option>
           </select>
         </div>
         {notice && <p role="status" className="border-b border-[#d9e0db] bg-[#e5f0e9] px-4 py-3 text-sm text-[#174b32]">{notice}</p>}
