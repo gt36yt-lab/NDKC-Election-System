@@ -87,7 +87,7 @@ export default function StudentImport({ onImported }: { onImported: (students: A
         <button type="submit" disabled={!file || isImporting} className="inline-flex h-10 shrink-0 items-center justify-center gap-2 bg-[#005a36] px-4 text-xs font-bold text-white hover:bg-[#003d28] disabled:cursor-wait disabled:opacity-55"><Upload aria-hidden="true" className="size-4" />{isImporting ? "Importing…" : "Import CSV"}</button>
       </form>
       {error && <p role="alert" className="mt-3 text-sm text-[#8c3328]">{error}</p>}
-      {credentials.length > 0 && <p role="status" className="mt-3 text-sm text-[#174b32]">Created {credentials.length} account{credentials.length === 1 ? "" : "s"}. Download the credentials now; passwords are not stored for later retrieval.</p>}
+      {credentials.length > 0 && <p role="status" className="mt-3 text-sm text-[#174b32]">Prepared credentials for {credentials.length} student account{credentials.length === 1 ? "" : "s"}. Download them now; passwords are not stored for later retrieval.</p>}
       {errors.length > 0 && <div className="mt-3 max-h-36 overflow-y-auto border-l-2 border-[#b84a3a] pl-3 text-xs leading-5 text-[#8c3328]" role="alert">{errors.map((item) => <p key={item.lrn}>{item.lrn}: {item.error}</p>)}</div>}
     </section>
   );

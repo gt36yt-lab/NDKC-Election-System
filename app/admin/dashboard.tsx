@@ -111,7 +111,11 @@ export default function AdminDashboard({ initialStudents, initialCandidates, ini
       </div>
 
       {activeTab === "students" ? <>
-      <StudentImport onImported={(imported) => setStudents((current) => [...current, ...imported])} />
+      <StudentImport onImported={(imported) => setStudents((current) => {
+        const merged = new Map(current.map((student) => [student.lrn, student]));
+        for (const student of imported) merged.set(student.lrn, student);
+        return [...merged.values()];
+      })} />
       <section className="mt-10" aria-labelledby="student-records-title">
         <div className="flex flex-wrap items-end justify-between gap-4 border-b border-[#cfd8d1] pb-4">
           <div>

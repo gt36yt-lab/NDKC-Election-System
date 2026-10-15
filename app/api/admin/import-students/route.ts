@@ -8,6 +8,20 @@ const EMAIL_DOMAIN = "students.ndkc.invalid";
 const MAX_CSV_BYTES = 1_000_000;
 const MAX_STUDENTS = 500;
 
+async function findAuthUserIdByEmail(admin: ReturnType<typeof createAdminClient>, email: string) {
+  for (let page = 1; ; page += 1) {
+    const { data, error } = await admin.auth.admin.listUsers({ page, perPage: 1000 });
+    if (error) return { id: null, error };
+    const user = data.users.find((item) => item.email?.toLowerCase() === email.toLowerCase());
+    if (user) return { id: user.id, error: null };
+    if (data.users.length < 1000) return { id: null, error: null };
+  }
+}
+
+function isDuplicateAuthUser(error: { code?: string; message: string }) {
+  return error.code === "email_exists" || /already (?:been )?registered|already exists/i.test(error.message);
+}
+
 export async function POST(request: Request) {
   const access = await getAdminAccess();
   if (access.status !== "authorized") {
@@ -38,53 +52,84 @@ export async function POST(request: Request) {
   const admin = createAdminClient();
   const { data: existingStudents, error: existingError } = await admin
     .from("students")
-    .select("lrn")
+    .select("id, lrn, has_voted, has_agreed_terms")
     .in("lrn", students.map((student) => student.lrn));
   if (existingError) return NextResponse.json({ error: "Existing student records could not be checked." }, { status: 500 });
 
-  const existingLrns = new Set((existingStudents ?? []).map((student) => String(student.lrn)));
+  const existingByLrn = new Map((existingStudents ?? []).map((student) => [String(student.lrn), student]));
   const credentials: { id: string; lrn: string; full_name: string; grade_level: number; section: string; assigned_password: string; otp: string }[] = [];
   const errors: { lrn: string; error: string }[] = [];
 
   for (const student of students) {
-    if (existingLrns.has(student.lrn)) {
-      errors.push({ lrn: student.lrn, error: "A student record with this LRN already exists." });
-      continue;
-    }
-
+    const email = `${student.lrn}@${EMAIL_DOMAIN}`;
     const assignedPassword = `${randomBytes(18).toString("base64url")}aA1!`;
     const otp = String(randomInt(100000, 1000000));
     const { data: created, error: createError } = await admin.auth.admin.createUser({
-      email: `${student.lrn}@${EMAIL_DOMAIN}`,
+      email,
       password: assignedPassword,
       email_confirm: true,
       user_metadata: { lrn: student.lrn, full_name: student.full_name },
     });
 
-    if (createError || !created.user) {
-      errors.push({ lrn: student.lrn, error: createError?.message ?? "Auth account could not be created." });
+    let userId = created.user?.id;
+    const isNewAuthUser = Boolean(userId);
+    if (createError) {
+      if (!isDuplicateAuthUser(createError)) {
+        errors.push({ lrn: student.lrn, error: createError.message });
+        continue;
+      }
+
+      const existingStudent = existingByLrn.get(student.lrn);
+      let existingUserId = existingStudent?.id ?? null;
+      if (!existingUserId) {
+        const lookup = await findAuthUserIdByEmail(admin, email);
+        if (lookup.error) {
+          errors.push({ lrn: student.lrn, error: "Existing Auth account could not be loaded." });
+          continue;
+        }
+        existingUserId = lookup.id;
+      }
+      if (!existingUserId) {
+        errors.push({ lrn: student.lrn, error: "Auth reported a duplicate account, but the existing user could not be found." });
+        continue;
+      }
+
+      const { error: updateAuthError } = await admin.auth.admin.updateUserById(existingUserId, {
+        password: assignedPassword,
+        email_confirm: true,
+        user_metadata: { lrn: student.lrn, full_name: student.full_name },
+      });
+      if (updateAuthError) {
+        errors.push({ lrn: student.lrn, error: "Existing Auth account could not be updated with the generated password." });
+        continue;
+      }
+      userId = existingUserId;
+    }
+
+    if (!userId) {
+      errors.push({ lrn: student.lrn, error: "Auth account could not be created." });
       continue;
     }
 
-    const { error: insertError } = await admin.from("students").insert({
-      id: created.user.id,
+    const existingStudent = existingByLrn.get(student.lrn);
+    const { error: upsertError } = await admin.from("students").upsert({
+      id: userId,
       lrn: student.lrn,
       full_name: student.full_name,
       grade_level: student.grade_level,
       section: student.section,
       otp_code: otp,
-      has_agreed_terms: false,
-      has_voted: false,
-    });
+      has_agreed_terms: existingStudent?.has_agreed_terms ?? false,
+      has_voted: existingStudent?.has_voted ?? false,
+    }, { onConflict: "lrn" });
 
-    if (insertError) {
-      await admin.auth.admin.deleteUser(created.user.id);
-      errors.push({ lrn: student.lrn, error: "Student record could not be created; the Auth account was rolled back." });
+    if (upsertError) {
+      if (isNewAuthUser) await admin.auth.admin.deleteUser(userId);
+      errors.push({ lrn: student.lrn, error: "Student record could not be synchronized." });
       continue;
     }
 
-    credentials.push({ id: created.user.id, lrn: student.lrn, full_name: student.full_name, grade_level: student.grade_level, section: student.section, assigned_password: assignedPassword, otp });
-    existingLrns.add(student.lrn);
+    credentials.push({ id: userId, lrn: student.lrn, full_name: student.full_name, grade_level: student.grade_level, section: student.section, assigned_password: assignedPassword, otp });
   }
 
   return NextResponse.json({ imported: credentials.length, credentials, errors });
