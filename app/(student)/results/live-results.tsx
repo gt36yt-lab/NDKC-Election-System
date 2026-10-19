@@ -10,7 +10,7 @@ export type ResultCandidate = {
   position: string;
   party_id: string | null;
   party_name: string;
-  image_url: string | null;
+  photo_url: string | null;
 };
 
 export default function LiveResults({ candidates, initialVotes }: { candidates: ResultCandidate[]; initialVotes: VoteRow[] }) {

@@ -4,7 +4,7 @@ import { useState } from "react";
 import { Download, Upload } from "lucide-react";
 import type { AdminStudent } from "./dashboard";
 
-type Credential = { id: string; lrn: string; full_name: string; grade_level: number; section: string; assigned_password: string; otp: string };
+type Credential = { id: string; lrn: string; email: string | null; full_name: string; grade_level: number; section: string; assigned_password: string; otp: string };
 type ImportError = { lrn: string; error: string };
 
 function csvCell(value: string) {
@@ -39,6 +39,8 @@ export default function StudentImport({ onImported }: { onImported: (students: A
       onImported(importedCredentials.map((item) => ({
         id: item.id,
         lrn: item.lrn,
+        email: item.email,
+        raw_password: item.assigned_password,
         full_name: item.full_name,
         grade_level: item.grade_level,
         section: item.section,
@@ -59,8 +61,8 @@ export default function StudentImport({ onImported }: { onImported: (students: A
   function downloadCredentials() {
     if (credentials.length === 0) return;
     const lines = [
-      ["lrn", "full_name", "assigned_password", "otp"].join(","),
-      ...credentials.map((item) => [item.lrn, item.full_name, item.assigned_password, item.otp].map(csvCell).join(",")),
+      ["lrn", "full_name", "email", "assigned_password", "otp"].join(","),
+      ...credentials.map((item) => [item.lrn, item.full_name, item.email ?? "", item.assigned_password, item.otp].map(csvCell).join(",")),
     ];
     const url = URL.createObjectURL(new Blob([lines.join("\r\n")], { type: "text/csv;charset=utf-8" }));
     const link = document.createElement("a");
@@ -77,7 +79,7 @@ export default function StudentImport({ onImported }: { onImported: (students: A
       <div className="flex flex-wrap items-start justify-between gap-4">
         <div>
           <h2 id="student-import-title" className="text-sm font-bold">Import students</h2>
-          <p className="mt-1 text-xs leading-5 text-[#66736b]">CSV headers: lrn, full_name, grade_level, section. The section column is optional; missing values default to General.</p>
+          <p className="mt-1 text-xs leading-5 text-[#66736b]">CSV headers: lrn, full_name, grade_level, section, email. Section and email are optional; missing sections default to General.</p>
         </div>
         {credentials.length > 0 && <button type="button" onClick={downloadCredentials} className="inline-flex h-10 items-center gap-2 bg-[#005a36] px-4 text-xs font-bold text-white hover:bg-[#003d28]"><Download aria-hidden="true" className="size-4" />Download credentials ({credentials.length})</button>}
       </div>
@@ -87,7 +89,7 @@ export default function StudentImport({ onImported }: { onImported: (students: A
         <button type="submit" disabled={!file || isImporting} className="inline-flex h-10 shrink-0 items-center justify-center gap-2 bg-[#005a36] px-4 text-xs font-bold text-white hover:bg-[#003d28] disabled:cursor-wait disabled:opacity-55"><Upload aria-hidden="true" className="size-4" />{isImporting ? "Importing…" : "Import CSV"}</button>
       </form>
       {error && <p role="alert" className="mt-3 text-sm text-[#8c3328]">{error}</p>}
-      {credentials.length > 0 && <p role="status" className="mt-3 text-sm text-[#174b32]">Prepared credentials for {credentials.length} student account{credentials.length === 1 ? "" : "s"}. Download them now; passwords are not stored for later retrieval.</p>}
+      {credentials.length > 0 && <p role="status" className="mt-3 text-sm text-[#174b32]">Prepared credentials for {credentials.length} student account{credentials.length === 1 ? "" : "s"}. Download them now; passwords are retained in the restricted admin roster for credential resend.</p>}
       {errors.length > 0 && <div className="mt-3 max-h-36 overflow-y-auto border-l-2 border-[#b84a3a] pl-3 text-xs leading-5 text-[#8c3328]" role="alert">{errors.map((item) => <p key={item.lrn}>{item.lrn}: {item.error}</p>)}</div>}
     </section>
   );

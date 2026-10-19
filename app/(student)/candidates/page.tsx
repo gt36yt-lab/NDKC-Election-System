@@ -7,15 +7,30 @@ type Candidate = {
   position: string;
   party_id: string | null;
   platform: string | null;
-  image_url: string | null;
+  photo_url: string | null;
 };
 
 type Party = { id: string; name: string };
 
 export default async function CandidatesPage() {
   const supabase = await createClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  const { data: student } = user
+    ? await supabase.from("students").select("has_voted").eq("id", user.id).maybeSingle()
+    : { data: null };
+
+  if (student?.has_voted !== true) {
+    return (
+      <main className="page-enter mx-auto max-w-7xl px-5 py-10 sm:px-8 sm:py-14">
+        <p className="text-xs font-bold uppercase tracking-[0.18em] text-[#005a36]">Election count</p>
+        <h1 className="display-font mt-3 text-4xl">Candidate profiles</h1>
+        <p role="status" className="mt-8 border-y border-[#d9e0db] bg-white/80 px-5 py-8 text-sm text-[#66736b]">Election results are hidden until you cast your vote.</p>
+      </main>
+    );
+  }
+
   const [{ data: candidates, error: candidateError }, { data: parties, error: partyError }] = await Promise.all([
-    supabase.from("candidates").select("id, full_name, position, party_id, platform, image_url").order("full_name"),
+    supabase.from("candidates").select("id, full_name, position, party_id, platform, photo_url").order("full_name"),
     supabase.from("parties").select("id, name").order("name"),
   ]);
 
@@ -44,8 +59,8 @@ export default async function CandidatesPage() {
               <div className="mt-5 grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
                 {positionCandidates.map((candidate) => (
                   <article key={candidate.id} className="overflow-hidden border border-[#d9e0db] bg-white">
-                    {candidate.image_url ? (
-                      <Image src={candidate.image_url} alt={candidate.full_name} width={640} height={420} unoptimized className="h-56 w-full object-cover" />
+                      {candidate.photo_url ? (
+                      <Image src={candidate.photo_url} alt={candidate.full_name} width={640} height={420} unoptimized className="h-56 w-full object-cover" />
                     ) : (
                       <div aria-hidden="true" className="grid h-56 place-items-center bg-[#e5f0e9] text-5xl font-semibold text-[#005a36]">
                         {candidate.full_name.trim().charAt(0).toUpperCase()}

@@ -1,11 +1,23 @@
 "use client";
 
 import { useState } from "react";
+import Image from "next/image";
 import { Trash2 } from "lucide-react";
 import type { AdminCandidate, AdminParty } from "./dashboard";
 
 const GRADES = [7, 8, 9, 10, 11, 12];
 const fieldClass = "h-11 w-full border border-[#cfd8d1] bg-white px-3 text-sm outline-none focus:border-[#005a36] focus:ring-2 focus:ring-[#005a36]/15";
+
+async function uploadImage(file: File | null, bucket: "candidate-photos" | "party-logos") {
+  if (!file || file.size === 0) return null;
+  const upload = new FormData();
+  upload.set("bucket", bucket);
+  upload.set("file", file);
+  const response = await fetch("/api/admin/uploads", { method: "POST", body: upload });
+  const result = await response.json() as { publicUrl?: string; error?: string };
+  if (!response.ok || !result.publicUrl) throw new Error(result.error ?? "Image upload failed.");
+  return result.publicUrl;
+}
 
 export default function CandidateManagement({ initialCandidates, initialParties }: { initialCandidates: AdminCandidate[]; initialParties: AdminParty[] }) {
   const [candidates, setCandidates] = useState(initialCandidates);
@@ -22,6 +34,7 @@ export default function CandidateManagement({ initialCandidates, initialParties 
     setNotice("");
     const form = new FormData(formElement);
     try {
+      const photo_url = await uploadImage(form.get("candidate_photo") as File | null, "candidate-photos");
       const response = await fetch("/api/admin/candidates", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -30,7 +43,7 @@ export default function CandidateManagement({ initialCandidates, initialParties 
           position: form.get("position"),
           party_id: form.get("party_id"),
           platform: form.get("platform"),
-          image_url: form.get("image_url"),
+          photo_url,
           allowed_grade_levels: selectedGrades,
         }),
       });
@@ -53,10 +66,11 @@ export default function CandidateManagement({ initialCandidates, initialParties 
     const form = new FormData(formElement);
     setNotice("");
     try {
+      const logo_url = await uploadImage(form.get("party_logo") as File | null, "party-logos");
       const response = await fetch("/api/admin/parties", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name: form.get("party_name"), description: form.get("party_description") }),
+        body: JSON.stringify({ name: form.get("party_name"), description: form.get("party_description"), logo_url }),
       });
       const result = await response.json() as { party?: AdminParty; error?: string };
       if (!response.ok || !result.party) throw new Error(result.error ?? "Party could not be created.");
@@ -95,7 +109,7 @@ export default function CandidateManagement({ initialCandidates, initialParties 
             <label className="text-xs font-semibold">Full name<input name="full_name" required maxLength={120} className={`${fieldClass} mt-2`} /></label>
             <label className="text-xs font-semibold">Position<input name="position" required maxLength={80} placeholder="e.g. President" className={`${fieldClass} mt-2`} /></label>
             <label className="text-xs font-semibold">Party<select name="party_id" defaultValue="" className={`${fieldClass} mt-2`}><option value="">Independent</option>{parties.map((party) => <option key={party.id} value={party.id}>{party.name}</option>)}</select></label>
-            <label className="text-xs font-semibold">Image URL<input name="image_url" type="url" className={`${fieldClass} mt-2`} /></label>
+            <label className="text-xs font-semibold">Candidate photo<input name="candidate_photo" type="file" accept="image/jpeg,image/png,image/webp" className="mt-2 block w-full text-sm file:mr-3 file:h-10 file:border-0 file:bg-[#e5f0e9] file:px-3 file:text-xs file:font-semibold file:text-[#174b32]" /></label>
             <label className="text-xs font-semibold sm:col-span-2">Platform description<textarea name="platform" rows={3} className="mt-2 w-full border border-[#cfd8d1] bg-white px-3 py-2 text-sm outline-none focus:border-[#005a36] focus:ring-2 focus:ring-[#005a36]/15" /></label>
             <fieldset className="sm:col-span-2">
               <legend className="text-xs font-semibold">Eligible grade levels</legend>
@@ -119,11 +133,12 @@ export default function CandidateManagement({ initialCandidates, initialParties 
           <form onSubmit={(event) => void addParty(event)} className="mt-4 space-y-4 border-y border-[#d9e0db] bg-white/80 p-5">
             <label className="block text-xs font-semibold">Party name<input name="party_name" required maxLength={100} className={`${fieldClass} mt-2`} /></label>
             <label className="block text-xs font-semibold">Description<textarea name="party_description" rows={3} className="mt-2 w-full border border-[#cfd8d1] bg-white px-3 py-2 text-sm outline-none focus:border-[#005a36] focus:ring-2 focus:ring-[#005a36]/15" /></label>
+            <label className="block text-xs font-semibold">Party logo<input name="party_logo" type="file" accept="image/jpeg,image/png,image/webp" className="mt-2 block w-full text-sm file:mr-3 file:h-10 file:border-0 file:bg-[#e5f0e9] file:px-3 file:text-xs file:font-semibold file:text-[#174b32]" /></label>
             <button type="submit" className="h-11 bg-[#005a36] px-5 text-sm font-bold text-white hover:bg-[#003d28]">Add party</button>
           </form>
           <div className="mt-4 divide-y divide-[#d9e0db] border-y border-[#d9e0db] bg-white/70">
             {parties.map((party) => <article key={party.id} className="flex items-center justify-between gap-3 px-4 py-3">
-              <div className="min-w-0"><p className="font-semibold">{party.name}</p>{party.description && <p className="mt-1 line-clamp-2 text-xs text-[#66736b]">{party.description}</p>}</div>
+              <div className="flex min-w-0 items-center gap-3">{party.logo_url && <Image src={party.logo_url} alt="" width={48} height={48} unoptimized className="size-12 shrink-0 border border-[#d9e0db] bg-white object-contain p-1" />}<div className="min-w-0"><p className="font-semibold">{party.name}</p>{party.description && <p className="mt-1 line-clamp-2 text-xs text-[#66736b]">{party.description}</p>}</div></div>
               <button type="button" onClick={() => void deleteItem("party", party.id)} aria-label={`Delete party ${party.name}`} className="grid size-9 shrink-0 place-items-center border border-[#d9e0db] text-[#8c3328] hover:bg-[#fbf0ee]"><Trash2 aria-hidden="true" className="size-4" /></button>
             </article>)}
             {parties.length === 0 && <p className="px-4 py-6 text-sm text-[#66736b]">No parties have been added.</p>}
