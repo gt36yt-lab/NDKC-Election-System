@@ -1,5 +1,5 @@
 import Image from "next/image";
-import { createPublicDataClient } from "@/lib/supabase/public-data";
+import { createClient } from "@/lib/supabase/server";
 
 type Candidate = {
   id: string;
@@ -7,10 +7,10 @@ type Candidate = {
   position: string;
   party_id: string | null;
   platform: string | null;
-  photo_url: string | null;
+  image_url: string | null;
 };
 
-type Party = { id: string; name: string; description: string | null; logo_url: string | null };
+type Party = { id: string; name: string; description: string | null };
 
 function CandidateList({ candidates }: { candidates: Candidate[] }) {
   if (candidates.length === 0) return <p className="mt-4 text-sm text-[#66736b]">No candidates listed.</p>;
@@ -19,8 +19,8 @@ function CandidateList({ candidates }: { candidates: Candidate[] }) {
     <div className="mt-5 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
       {candidates.map((candidate) => (
         <article key={candidate.id} className="flex gap-4 border-y border-[#d9e0db] bg-white px-4 py-4">
-          {candidate.photo_url ? (
-            <Image src={candidate.photo_url} alt="" width={160} height={160} unoptimized className="size-20 shrink-0 object-cover" />
+          {candidate.image_url ? (
+            <Image src={candidate.image_url} alt="" width={160} height={160} unoptimized className="size-20 shrink-0 object-cover" />
           ) : (
             <div aria-hidden="true" className="grid size-20 shrink-0 place-items-center bg-[#e5f0e9] text-2xl font-semibold text-[#005a36]">
               {candidate.full_name.trim().charAt(0).toUpperCase()}
@@ -38,10 +38,10 @@ function CandidateList({ candidates }: { candidates: Candidate[] }) {
 }
 
 export default async function TeamsPage() {
-  const supabase = await createPublicDataClient();
+  const supabase = await createClient();
   const [{ data: parties, error: partyError }, { data: candidates, error: candidateError }] = await Promise.all([
-    supabase.from("parties").select("id, name, description, logo_url").order("name"),
-    supabase.from("candidates").select("id, full_name, position, party_id, platform, photo_url").order("full_name"),
+    supabase.from("parties").select("id, name, description").order("name"),
+    supabase.from("candidates").select("id, full_name, position, party_id, platform, image_url").order("full_name"),
   ]);
   const error = partyError ?? candidateError;
   const allCandidates = (candidates ?? []) as Candidate[];
@@ -58,7 +58,7 @@ export default async function TeamsPage() {
         <div className="mt-10 space-y-12">
           {(parties ?? []).map((party: Party) => (
             <section key={party.id} aria-labelledby={`party-${party.id}`}>
-              <div className="flex items-center gap-4 border-b border-[#d9e0db] pb-3">{party.logo_url && <Image src={party.logo_url} alt={`${party.name} logo`} width={72} height={72} unoptimized className="size-16 shrink-0 bg-white object-contain p-1" />}<h2 id={`party-${party.id}`} className="display-font text-2xl">{party.name}</h2></div>
+              <h2 id={`party-${party.id}`} className="display-font border-b border-[#d9e0db] pb-3 text-2xl">{party.name}</h2>
               {party.description && <p className="mt-3 max-w-3xl text-sm leading-6 text-[#66736b]">{party.description}</p>}
               <CandidateList candidates={allCandidates.filter((candidate) => candidate.party_id === party.id)} />
             </section>

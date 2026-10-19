@@ -14,7 +14,7 @@ export async function POST(request: Request) {
   const position = typeof body?.position === "string" ? body.position.trim() : "";
   const party_id = typeof body?.party_id === "string" && body.party_id ? body.party_id : null;
   const platform = typeof body?.platform === "string" ? body.platform.trim() : "";
-  const photo_url = typeof body?.photo_url === "string" ? body.photo_url.trim() : "";
+  const image_url = typeof body?.image_url === "string" ? body.image_url.trim() : "";
   const allowed_grade_levels = body?.allowed_grade_levels;
 
   if (!full_name || !position) return NextResponse.json({ error: "Full name and position are required." }, { status: 400 });
@@ -24,8 +24,8 @@ export async function POST(request: Request) {
 
   const { data, error } = await createAdminClient()
     .from("candidates")
-    .insert({ full_name, position, party_id, platform: platform || null, photo_url: photo_url || null, allowed_grade_levels })
-    .select("id, full_name, position, party_id, platform, photo_url, allowed_grade_levels")
+    .insert({ full_name, position, party_id, platform: platform || null, image_url: image_url || null, allowed_grade_levels })
+    .select("id, full_name, position, party_id, platform, image_url, allowed_grade_levels")
     .single();
   if (error) return NextResponse.json({ error: "Candidate could not be created. Verify the party and candidate table policies." }, { status: 500 });
   return NextResponse.json({ candidate: data }, { status: 201 });

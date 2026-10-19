@@ -1,5 +1,5 @@
 import Image from "next/image";
-import { createPublicDataClient } from "@/lib/supabase/public-data";
+import { createClient } from "@/lib/supabase/server";
 
 type Candidate = {
   id: string;
@@ -7,15 +7,15 @@ type Candidate = {
   position: string;
   party_id: string | null;
   platform: string | null;
-  photo_url: string | null;
+  image_url: string | null;
 };
 
 type Party = { id: string; name: string };
 
 export default async function CandidatesPage() {
-  const supabase = await createPublicDataClient();
+  const supabase = await createClient();
   const [{ data: candidates, error: candidateError }, { data: parties, error: partyError }] = await Promise.all([
-    supabase.from("candidates").select("id, full_name, position, party_id, platform, photo_url").order("full_name"),
+    supabase.from("candidates").select("id, full_name, position, party_id, platform, image_url").order("full_name"),
     supabase.from("parties").select("id, name").order("name"),
   ]);
 
@@ -44,8 +44,8 @@ export default async function CandidatesPage() {
               <div className="mt-5 grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
                 {positionCandidates.map((candidate) => (
                   <article key={candidate.id} className="overflow-hidden border border-[#d9e0db] bg-white">
-                      {candidate.photo_url ? (
-                      <Image src={candidate.photo_url} alt={candidate.full_name} width={640} height={420} unoptimized className="h-56 w-full object-cover" />
+                    {candidate.image_url ? (
+                      <Image src={candidate.image_url} alt={candidate.full_name} width={640} height={420} unoptimized className="h-56 w-full object-cover" />
                     ) : (
                       <div aria-hidden="true" className="grid h-56 place-items-center bg-[#e5f0e9] text-5xl font-semibold text-[#005a36]">
                         {candidate.full_name.trim().charAt(0).toUpperCase()}

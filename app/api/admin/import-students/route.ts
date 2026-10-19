@@ -52,20 +52,20 @@ export async function POST(request: Request) {
   const admin = createAdminClient();
   const { data: existingStudents, error: existingError } = await admin
     .from("students")
-    .select("id, lrn, email, has_voted, has_agreed_terms")
+    .select("id, lrn, has_voted, has_agreed_terms")
     .in("lrn", students.map((student) => student.lrn));
   if (existingError) return NextResponse.json({ error: "Existing student records could not be checked." }, { status: 500 });
 
   const existingByLrn = new Map((existingStudents ?? []).map((student) => [String(student.lrn), student]));
-  const credentials: { id: string; lrn: string; email: string | null; full_name: string; grade_level: number; section: string; assigned_password: string; otp: string }[] = [];
+  const credentials: { id: string; lrn: string; full_name: string; grade_level: number; section: string; assigned_password: string; otp: string }[] = [];
   const errors: { lrn: string; error: string }[] = [];
 
   for (const student of students) {
-    const authEmail = `${student.lrn}@${EMAIL_DOMAIN}`;
+    const email = `${student.lrn}@${EMAIL_DOMAIN}`;
     const assignedPassword = `${randomBytes(18).toString("base64url")}aA1!`;
     const otp = String(randomInt(100000, 1000000));
     const { data: created, error: createError } = await admin.auth.admin.createUser({
-      email: authEmail,
+      email,
       password: assignedPassword,
       email_confirm: true,
       user_metadata: { lrn: student.lrn, full_name: student.full_name },
@@ -82,7 +82,7 @@ export async function POST(request: Request) {
       const existingStudent = existingByLrn.get(student.lrn);
       let existingUserId = existingStudent?.id ?? null;
       if (!existingUserId) {
-        const lookup = await findAuthUserIdByEmail(admin, authEmail);
+        const lookup = await findAuthUserIdByEmail(admin, email);
         if (lookup.error) {
           errors.push({ lrn: student.lrn, error: "Existing Auth account could not be loaded." });
           continue;
@@ -118,8 +118,6 @@ export async function POST(request: Request) {
       full_name: student.full_name,
       grade_level: student.grade_level,
       section: student.section,
-      email: student.email ?? existingStudent?.email ?? null,
-      raw_password: assignedPassword,
       otp_code: otp,
       has_agreed_terms: existingStudent?.has_agreed_terms ?? false,
       has_voted: existingStudent?.has_voted ?? false,
@@ -131,7 +129,7 @@ export async function POST(request: Request) {
       continue;
     }
 
-    credentials.push({ id: userId, lrn: student.lrn, email: student.email ?? existingStudent?.email ?? null, full_name: student.full_name, grade_level: student.grade_level, section: student.section, assigned_password: assignedPassword, otp });
+    credentials.push({ id: userId, lrn: student.lrn, full_name: student.full_name, grade_level: student.grade_level, section: student.section, assigned_password: assignedPassword, otp });
   }
 
   return NextResponse.json({ imported: credentials.length, credentials, errors });

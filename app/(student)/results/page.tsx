@@ -5,23 +5,8 @@ type Party = { id: string; name: string };
 
 export default async function ResultsPage() {
   const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
-  const { data: student } = user
-    ? await supabase.from("students").select("has_voted").eq("id", user.id).maybeSingle()
-    : { data: null };
-
-  if (student?.has_voted !== true) {
-    return (
-      <main className="page-enter mx-auto max-w-7xl px-5 py-10 sm:px-8 sm:py-14">
-        <p className="text-xs font-bold uppercase tracking-[0.18em] text-[#005a36]">Election count</p>
-        <h1 className="display-font mt-3 text-4xl">Live results</h1>
-        <p role="status" className="mt-8 border-y border-[#d9e0db] bg-white/80 px-5 py-8 text-sm text-[#66736b]">Election results are hidden until you cast your vote.</p>
-      </main>
-    );
-  }
-
   const [{ data: candidates, error: candidateError }, { data: votes, error: voteError }, { data: parties }] = await Promise.all([
-    supabase.from("candidates").select("id, full_name, position, party_id, photo_url").order("position").order("full_name"),
+    supabase.from("candidates").select("id, full_name, position, party_id, image_url").order("position").order("full_name"),
     supabase.from("votes").select("candidate_id, position"),
     supabase.from("parties").select("id, name"),
   ]);

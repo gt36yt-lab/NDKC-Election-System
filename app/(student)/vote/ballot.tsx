@@ -30,8 +30,6 @@ export default function Ballot({
   const [selected, setSelected] = useState<Record<string, string>>({});
   const [lrn, setLrn] = useState("");
   const [otp, setOtp] = useState("");
-  const [termsChecked, setTermsChecked] = useState(false);
-  const [termsAccepted, setTermsAccepted] = useState(false);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [error, setError] = useState("");
   const [isPending, startTransition] = useTransition();
@@ -63,19 +61,6 @@ export default function Ballot({
     <>
       {groups.size === 0 ? (
         <p className="mt-8 border-y border-[#d9e0db] bg-white/80 px-5 py-8 text-sm text-[#66736b]">No eligible candidates are available for your grade.</p>
-      ) : !termsAccepted ? (
-        <div className="fixed inset-0 z-50 grid place-items-center overflow-y-auto bg-[#10251b]/65 p-4 backdrop-blur-[2px]">
-          <section role="dialog" aria-modal="true" aria-labelledby="voting-terms-title" className="my-auto w-full max-w-lg border border-[#d9e0db] bg-white p-6 shadow-2xl sm:p-9">
-            <p className="text-xs font-bold uppercase tracking-[0.18em] text-[#005a36]">Before you vote</p>
-            <h2 id="voting-terms-title" className="display-font mt-2 text-2xl">Terms &amp; Conditions</h2>
-            <p className="mt-4 text-sm leading-6 text-[#4e5b53]">By using the SSLG E-Voting System, you agree to participate honestly and responsibly. Your account is for your personal use; do not share your login credentials or submit more than one ballot. Your vote is confidential and will be used only for this election.</p>
-            <label className="mt-5 flex cursor-pointer items-start gap-3 border-y border-[#e4e9e5] py-4 text-sm leading-5">
-              <input type="checkbox" checked={termsChecked} onChange={(event) => setTermsChecked(event.target.checked)} className="mt-0.5 size-4 accent-[#005a36]" />
-              <span>I agree with the terms and conditions</span>
-            </label>
-            <button type="button" disabled={!termsChecked} onClick={() => setTermsAccepted(true)} className="mt-5 h-11 bg-[#005a36] px-5 text-sm font-bold text-white hover:bg-[#003d28] disabled:cursor-not-allowed disabled:bg-[#aab8af]">Continue to ballot</button>
-          </section>
-        </div>
       ) : (
         <div className="mt-10 space-y-10">
           {[...groups.entries()].map(([position, positionCandidates]) => (
