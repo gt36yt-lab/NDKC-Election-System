@@ -36,6 +36,8 @@ export default function AdminDashboard({ initialStudents, initialCandidates, ini
   const [rowActionId, setRowActionId] = useState<string | null>(null);
   const [editingStudent, setEditingStudent] = useState<AdminStudent | null>(null);
   const [editDraft, setEditDraft] = useState({ full_name: "", grade_level: "7", section: "", email: "" });
+  const [emailingStudent, setEmailingStudent] = useState<AdminStudent | null>(null);
+  const [emailDraft, setEmailDraft] = useState({ recipient: "", subject: "", body: "" });
   const [notice, setNotice] = useState("");
   const [activeTab, setActiveTab] = useState<"students" | "candidates">("students");
   const [gradeFilter, setGradeFilter] = useState("all");
@@ -60,17 +62,17 @@ export default function AdminDashboard({ initialStudents, initialCandidates, ini
   }, [gradeFilter, query, sectionFilter, students, votingStatusFilter]);
 
   async function resetOtp(student: AdminStudent) {
-    if (student.has_voted || resettingId) return;
+    if (resettingId) return;
     setResettingId(student.id);
     setNotice("");
     try {
       const response = await fetch(`/api/admin/students/${encodeURIComponent(student.id)}/otp`, { method: "POST" });
-      const result = await response.json() as { otp?: string; error?: string };
-      if (!response.ok || !result.otp) throw new Error(result.error ?? "OTP could not be changed.");
-      setStudents((current) => current.map((item) => item.id === student.id ? { ...item, otp_code: result.otp! } : item));
-      setNotice(`A new OTP was generated for ${student.full_name}.`);
+      const result = await response.json() as { otp?: string; password?: string; error?: string };
+      if (!response.ok || !result.otp || !result.password) throw new Error(result.error ?? "Credentials could not be changed.");
+      setStudents((current) => current.map((item) => item.id === student.id ? { ...item, otp_code: result.otp!, raw_password: result.password! } : item));
+      setNotice(`A new password and OTP were generated for ${student.full_name}.`);
     } catch (error) {
-      setNotice(error instanceof Error ? error.message : "OTP could not be changed.");
+      setNotice(error instanceof Error ? error.message : "Credentials could not be changed.");
     } finally {
       setResettingId(null);
     }
@@ -94,14 +96,31 @@ export default function AdminDashboard({ initialStudents, initialCandidates, ini
     }
   }
 
-  async function sendCredentials(student: AdminStudent) {
+  function openEmailDraft(student: AdminStudent) {
+    setEmailingStudent(student);
+    setEmailDraft({
+      recipient: student.email ?? "",
+      subject: "Your SSLG E-Voting credentials",
+      body: `Hello ${student.full_name},\n\nYour SSLG E-Voting sign-in details are below.\n\nLRN: ${student.lrn}\nPassword: ${student.raw_password ?? "Not assigned. Ask the administrator to reset OTP / Password."}\nOTP: ${student.otp_code ?? "Not assigned. Ask the administrator to reset OTP / Password."}\n\nKeep these credentials private.`,
+    });
+  }
+
+  async function sendCredentials(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (!emailingStudent || rowActionId) return;
+    const student = emailingStudent;
     setRowActionId(student.id);
     setNotice("");
     try {
-      const response = await fetch("/api/admin/send-credentials", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ student_id: student.id }) });
+      const response = await fetch("/api/admin/send-credentials", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ student_id: student.id, recipient_email: emailDraft.recipient, subject: emailDraft.subject, text: emailDraft.body }),
+      });
       const result = await response.json() as { error?: string };
       if (!response.ok) throw new Error(result.error ?? "Email could not be sent.");
-      setNotice(`Credentials sent to ${student.email}.`);
+      setEmailingStudent(null);
+      setNotice(`Credentials sent to ${emailDraft.recipient}.`);
     } catch (error) {
       setNotice(error instanceof Error ? error.message : "Email could not be sent.");
     } finally {
@@ -235,13 +254,14 @@ export default function AdminDashboard({ initialStudents, initialCandidates, ini
                   <td className="px-3 py-3 font-mono tabular-nums">{student.otp_code ?? "—"}</td>
                   <td className="px-3 py-3"><span className={student.has_voted ? "font-semibold text-[#005a36]" : "text-[#66736b]"}>{student.has_voted ? "Voted" : "Pending"}</span></td>
                   <td className="px-3 py-3 text-right"><div className="flex justify-end gap-2">
-                    <button type="button" disabled={rowActionId !== null} onClick={() => void sendCredentials(student)} className="inline-flex h-9 items-center gap-1.5 border border-[#cfd8d1] px-2.5 text-xs font-semibold hover:border-[#005a36] hover:text-[#005a36] disabled:opacity-50"><Mail aria-hidden="true" className="size-3.5" />{rowActionId === student.id ? "Sending…" : "Send Email"}</button>
+                    <button type="button" disabled={rowActionId !== null} onClick={() => openEmailDraft(student)} className="inline-flex h-9 items-center gap-1.5 border border-[#cfd8d1] px-2.5 text-xs font-semibold hover:border-[#005a36] hover:text-[#005a36] disabled:opacity-50"><Mail aria-hidden="true" className="size-3.5" />Send Email</button>
                     <button type="button" disabled={rowActionId !== null} onClick={() => { setEditingStudent(student); setEditDraft({ full_name: student.full_name, grade_level: String(student.grade_level), section: student.section ?? "", email: student.email ?? "" }); }} aria-label={`Edit ${student.full_name}`} className="grid size-9 place-items-center border border-[#cfd8d1] hover:border-[#005a36] hover:text-[#005a36] disabled:opacity-50"><Pencil aria-hidden="true" className="size-4" /></button>
                     <button type="button" disabled={rowActionId !== null} onClick={() => void deleteStudent(student)} aria-label={`Delete ${student.full_name}`} className="grid size-9 place-items-center border border-[#d9e0db] text-[#8c3328] hover:bg-[#fbf0ee] disabled:opacity-50"><Trash2 aria-hidden="true" className="size-4" /></button>
-                    {student.has_voted ? <button type="button" disabled={resettingId !== null} onClick={() => void resetVote(student)} aria-label={`Reset vote for ${student.full_name}`} className="inline-flex h-9 items-center justify-center border border-[#b84a3a] px-3 text-xs font-semibold text-[#8c3328] transition hover:bg-[#fbf0ee] disabled:cursor-wait disabled:opacity-50">{resettingId === student.id ? "Resetting…" : "Reset vote"}</button> : <button type="button" disabled={resettingId !== null} onClick={() => void resetOtp(student)} title="Generate a new OTP" aria-label={`Generate new OTP for ${student.full_name}`} className="inline-flex h-9 items-center justify-center gap-2 border border-[#cfd8d1] px-3 text-xs font-semibold transition hover:border-[#005a36] hover:text-[#005a36] disabled:cursor-not-allowed disabled:opacity-50">
+                    {student.has_voted && <button type="button" disabled={resettingId !== null} onClick={() => void resetVote(student)} aria-label={`Reset vote for ${student.full_name}`} className="inline-flex h-9 items-center justify-center border border-[#b84a3a] px-3 text-xs font-semibold text-[#8c3328] transition hover:bg-[#fbf0ee] disabled:cursor-wait disabled:opacity-50">Reset vote</button>}
+                    <button type="button" disabled={resettingId !== null} onClick={() => void resetOtp(student)} title="Generate a new OTP and password" aria-label={`Reset OTP and password for ${student.full_name}`} className="inline-flex h-9 items-center justify-center gap-2 border border-[#cfd8d1] px-3 text-xs font-semibold transition hover:border-[#005a36] hover:text-[#005a36] disabled:cursor-not-allowed disabled:opacity-50">
                       <RefreshCw aria-hidden="true" className={`size-3.5 ${resettingId === student.id ? "animate-spin" : ""}`} />
-                      Reset OTP
-                    </button>}
+                      Reset OTP / Password
+                    </button>
                   </div></td>
                 </tr>
               ))}
@@ -263,6 +283,21 @@ export default function AdminDashboard({ initialStudents, initialCandidates, ini
           <div className="mt-6 flex justify-end gap-3">
             <button type="button" disabled={rowActionId !== null} onClick={() => setEditingStudent(null)} className="h-10 border border-[#cfd8d1] px-4 text-sm font-semibold">Cancel</button>
             <button type="submit" disabled={rowActionId !== null} className="h-10 bg-[#005a36] px-5 text-sm font-bold text-white disabled:opacity-50">{rowActionId === editingStudent.id ? "Saving…" : "Save changes"}</button>
+          </div>
+        </form>
+      </div>}
+      {emailingStudent && <div className="fixed inset-0 z-50 grid place-items-center overflow-y-auto bg-[#10251b]/65 p-4">
+        <form onSubmit={(event) => void sendCredentials(event)} className="my-auto w-full max-w-2xl border border-[#d9e0db] bg-white p-6 shadow-2xl sm:p-8" role="dialog" aria-modal="true" aria-labelledby="credential-email-title">
+          <p className="text-xs font-bold uppercase tracking-[0.18em] text-[#005a36]">Credential delivery</p>
+          <h2 id="credential-email-title" className="display-font mt-2 text-2xl">Review email to {emailingStudent.full_name}</h2>
+          <div className="mt-5 space-y-4">
+            <label className="block text-xs font-semibold">Recipient email<input required type="email" value={emailDraft.recipient} onChange={(event) => setEmailDraft((current) => ({ ...current, recipient: event.target.value }))} className="mt-2 h-11 w-full border border-[#cfd8d1] bg-white px-3 text-sm" /></label>
+            <label className="block text-xs font-semibold">Subject line<input required maxLength={200} value={emailDraft.subject} onChange={(event) => setEmailDraft((current) => ({ ...current, subject: event.target.value }))} className="mt-2 h-11 w-full border border-[#cfd8d1] bg-white px-3 text-sm" /></label>
+            <label className="block text-xs font-semibold">Email body<textarea required maxLength={10000} rows={10} value={emailDraft.body} onChange={(event) => setEmailDraft((current) => ({ ...current, body: event.target.value }))} className="mt-2 w-full border border-[#cfd8d1] bg-white px-3 py-2 text-sm leading-5" /></label>
+          </div>
+          <div className="mt-6 flex flex-wrap justify-end gap-3">
+            <button type="button" disabled={rowActionId !== null} onClick={() => setEmailingStudent(null)} className="h-10 border border-[#cfd8d1] px-4 text-sm font-semibold">Cancel</button>
+            <button type="submit" disabled={rowActionId !== null} className="h-10 bg-[#005a36] px-5 text-sm font-bold text-white disabled:opacity-50">{rowActionId === emailingStudent.id ? "Sending…" : "Confirm & Send"}</button>
           </div>
         </form>
       </div>}

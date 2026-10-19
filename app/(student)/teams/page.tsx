@@ -1,5 +1,5 @@
 import Image from "next/image";
-import { createClient } from "@/lib/supabase/server";
+import { createPublicDataClient } from "@/lib/supabase/public-data";
 
 type Candidate = {
   id: string;
@@ -38,7 +38,7 @@ function CandidateList({ candidates }: { candidates: Candidate[] }) {
 }
 
 export default async function TeamsPage() {
-  const supabase = await createClient();
+  const supabase = await createPublicDataClient();
   const [{ data: parties, error: partyError }, { data: candidates, error: candidateError }] = await Promise.all([
     supabase.from("parties").select("id, name, description, logo_url").order("name"),
     supabase.from("candidates").select("id, full_name, position, party_id, platform, photo_url").order("full_name"),

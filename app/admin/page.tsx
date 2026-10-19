@@ -27,15 +27,15 @@ export default async function AdminPage() {
   }
 
   const admin = createAdminClient();
-  const [{ data: students, error }, { data: candidates }, { data: parties }] = await Promise.all([
+  const [studentResult, candidateResult, partyResult] = await Promise.all([
     admin.from("students").select("id, lrn, email, raw_password, full_name, grade_level, section, otp_code, has_voted").order("grade_level").order("section").order("full_name"),
     admin.from("candidates").select("id, full_name, position, party_id, platform, photo_url, allowed_grade_levels").order("position").order("full_name"),
     admin.from("parties").select("id, name, description, logo_url").order("name"),
   ]);
 
-  if (error) {
-    return <AdminNotice title="Student records could not be loaded" message="Check the Supabase service role configuration and students table schema, then reload this page." />;
+  if (studentResult.error || candidateResult.error || partyResult.error) {
+    return <AdminNotice title="Election records could not be loaded" message="Check the Supabase service role configuration, RLS access, and the latest database migration, then reload this page." />;
   }
 
-  return <AdminDashboard initialStudents={(students ?? []) as AdminStudent[]} initialCandidates={(candidates ?? []) as AdminCandidate[]} initialParties={(parties ?? []) as AdminParty[]} />;
+  return <AdminDashboard initialStudents={(studentResult.data ?? []) as AdminStudent[]} initialCandidates={(candidateResult.data ?? []) as AdminCandidate[]} initialParties={(partyResult.data ?? []) as AdminParty[]} />;
 }
