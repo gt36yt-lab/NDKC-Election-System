@@ -45,7 +45,7 @@ export async function POST(request: Request) {
 
   const lrnSet = new Set<string>();
   for (const student of students) {
-    if (lrnSet.has(student.lrn)) return NextResponse.json({ error: `LRN ${student.lrn} appears more than once in the CSV.` }, { status: 400 });
+    if (lrnSet.has(student.lrn)) return NextResponse.json({ error: `Student ID ${student.lrn} appears more than once in the CSV.` }, { status: 400 });
     lrnSet.add(student.lrn);
   }
 

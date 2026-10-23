@@ -32,7 +32,7 @@ export default function LoginForm() {
     });
 
     if (signInError) {
-      setError("We couldn't sign you in. Check your LRN and assigned password.");
+      setError("We couldn't sign you in. Check your Student ID and assigned password.");
       setIsLoading(false);
       return;
     }
@@ -45,8 +45,8 @@ export default function LoginForm() {
   return (
     <form className="mt-8 space-y-5" onSubmit={handleSubmit}>
       <div>
-        <label htmlFor="lrn" className="mb-2 block text-sm font-semibold">Learner Reference Number</label>
-        <input id="lrn" inputMode="numeric" autoComplete="username" required value={lrn} onChange={(event) => setLrn(event.target.value)} className="h-12 w-full rounded-sm border border-[#cfd8d1] bg-white px-3 text-sm outline-none transition focus:border-[#005a36] focus:ring-2 focus:ring-[#005a36]/15" />
+        <label htmlFor="lrn" className="mb-2 block text-sm font-semibold">Student ID</label>
+        <input id="lrn" inputMode="numeric" autoComplete="username" placeholder="Enter your Student ID" required value={lrn} onChange={(event) => setLrn(event.target.value)} className="h-12 w-full rounded-sm border border-[#cfd8d1] bg-white px-3 text-sm outline-none transition focus:border-[#005a36] focus:ring-2 focus:ring-[#005a36]/15" />
       </div>
       <div>
         <label htmlFor="password" className="mb-2 block text-sm font-semibold">Assigned password</label>

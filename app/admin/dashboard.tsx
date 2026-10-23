@@ -125,7 +125,7 @@ export default function AdminDashboard({ initialStudents, initialCandidates, ini
           <label className="relative block w-full sm:w-80">
             <span className="sr-only">Search students</span>
             <Search aria-hidden="true" className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-[#66736b]" />
-            <input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search LRN, name, or grade" className="h-11 w-full border border-[#cfd8d1] bg-white pl-9 pr-3 text-sm outline-none focus:border-[#005a36] focus:ring-2 focus:ring-[#005a36]/15" />
+            <input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search Student ID, name, or grade" className="h-11 w-full border border-[#cfd8d1] bg-white pl-9 pr-3 text-sm outline-none focus:border-[#005a36] focus:ring-2 focus:ring-[#005a36]/15" />
           </label>
         </div>
         <div className="flex flex-wrap items-center gap-3 border-b border-[#d9e0db] py-3">
@@ -151,7 +151,7 @@ export default function AdminDashboard({ initialStudents, initialCandidates, ini
           <table className="w-full min-w-[900px] border-collapse text-left text-sm">
             <thead>
               <tr className="border-b border-[#cfd8d1] text-xs uppercase tracking-wide text-[#66736b]">
-                <th scope="col" className="px-3 py-3 font-bold">LRN</th>
+                <th scope="col" className="px-3 py-3 font-bold">Student ID</th>
                 <th scope="col" className="px-3 py-3 font-bold">Full name</th>
                 <th scope="col" className="px-3 py-3 font-bold">Grade</th>
                 <th scope="col" className="px-3 py-3 font-bold">Section</th>

@@ -27,6 +27,23 @@ button, a { -webkit-tap-highlight-color: transparent; }
 
 .display-font { font-family: Georgia, "Times New Roman", serif; }
 
+.school-logo-placeholder {
+  background-color: rgb(255 255 255 / 0.96);
+  background-image: url("/school-logo.png");
+  background-position: center;
+  background-repeat: no-repeat;
+  background-size: contain;
+  color: var(--green);
+}
+
+.school-background-panel {
+  background-color: var(--green);
+  background-image: linear-gradient(135deg, rgb(0 61 40 / 82%), rgb(0 90 54 / 72%)), url("/school-background.jpg");
+  background-position: center;
+  background-repeat: no-repeat;
+  background-size: cover;
+}
+
 .page-enter { animation: page-enter 420ms ease-out both; }
 
 @keyframes page-enter {

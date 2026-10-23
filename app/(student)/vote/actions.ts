@@ -18,7 +18,7 @@ export async function submitBallot(input: { lrn: string; otp: string; votes: Sub
   if (studentError || !student) return { error: "Your student profile could not be verified." };
   if (!student.has_agreed_terms) return { error: "Please accept the election terms before voting." };
   if (student.has_voted) return { error: "Our records show that your ballot has already been submitted." };
-  if (!student.lrn || input.lrn.trim() !== student.lrn) return { error: "The LRN does not match your student account." };
+  if (!student.lrn || input.lrn.trim() !== student.lrn) return { error: "The Student ID does not match your student account." };
   if (!input.otp.trim()) return { error: "Enter the OTP provided for your ballot." };
   if (input.votes.length === 0) return { error: "Select at least one candidate before continuing." };
 

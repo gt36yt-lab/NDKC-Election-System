@@ -30,7 +30,8 @@ export default function Ballot({
   const [selected, setSelected] = useState<Record<string, string>>({});
   const [lrn, setLrn] = useState("");
   const [otp, setOtp] = useState("");
-  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [isReviewOpen, setIsReviewOpen] = useState(false);
+  const [isOtpOpen, setIsOtpOpen] = useState(false);
   const [error, setError] = useState("");
   const [isPending, startTransition] = useTransition();
   const groups = new Map<string, Candidate[]>();
@@ -39,6 +40,7 @@ export default function Ballot({
     group.push(candidate);
     groups.set(candidate.position, group);
   }
+  const hasCompleteSelection = [...groups.keys()].every((position) => Boolean(selected[position]));
 
   if (hasVoted) {
     return (
@@ -80,35 +82,58 @@ export default function Ballot({
               </div>
             </fieldset>
           ))}
-          <button type="button" disabled={Object.keys(selected).length === 0} onClick={() => { setError(""); setIsModalOpen(true); }} className="h-12 rounded-sm bg-[#005a36] px-6 text-sm font-bold text-white transition hover:bg-[#003d28] disabled:cursor-not-allowed disabled:bg-[#aab8af]">Review and submit ballot</button>
+          <button type="button" disabled={!hasCompleteSelection} onClick={() => { setError(""); setIsReviewOpen(true); }} className="h-12 rounded-sm bg-[#005a36] px-6 text-sm font-bold text-white transition hover:bg-[#003d28] disabled:cursor-not-allowed disabled:bg-[#aab8af]">Review and submit ballot</button>
         </div>
       )}
-      {isModalOpen && <div className="fixed inset-0 z-50 grid place-items-center overflow-y-auto bg-[#10251b]/65 p-4 backdrop-blur-[2px]">
+      {isReviewOpen && <div className="fixed inset-0 z-50 grid place-items-center overflow-y-auto bg-[#10251b]/65 p-4 backdrop-blur-[2px]">
+        <section role="dialog" aria-modal="true" aria-labelledby="review-ballot-title" className="my-auto w-full max-w-lg border border-[#d9e0db] bg-white p-6 shadow-2xl sm:p-9">
+          <p className="text-xs font-bold uppercase tracking-[0.18em] text-[#005a36]">Final ballot review</p>
+          <h2 id="review-ballot-title" className="display-font mt-3 text-3xl">Check your choices</h2>
+          <p className="mt-3 text-sm leading-6 text-[#66736b]">Review your selection for each position. Your choices cannot be changed after submission.</p>
+          <ul className="mt-5 divide-y divide-[#e5eae6] border-y border-[#d9e0db]">
+            {[...groups.entries()].map(([position, positionCandidates]) => {
+              const candidate = positionCandidates.find((item) => item.id === selected[position]);
+              return (
+                <li key={position} className="py-3 text-sm">
+                  <span className="font-semibold">{position}:</span>{" "}
+                  {candidate ? candidate.full_name : <span className="italic text-[#66736b]">No selection</span>}
+                </li>
+              );
+            })}
+          </ul>
+          {error && <p role="alert" className="mt-4 text-sm leading-5 text-[#8c3328]">{error}</p>}
+          <div className="mt-6 flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
+            <button type="button" onClick={() => setIsReviewOpen(false)} className="h-11 border border-[#cfd8d1] px-4 text-sm font-semibold">Back to ballot</button>
+            <button type="button" onClick={() => { setError(""); setIsReviewOpen(false); setIsOtpOpen(true); }} className="h-11 bg-[#005a36] px-5 text-sm font-bold text-white hover:bg-[#003d28]">Continue to OTP verification</button>
+          </div>
+        </section>
+      </div>}
+      {isOtpOpen && <div className="fixed inset-0 z-50 grid place-items-center overflow-y-auto bg-[#10251b]/65 p-4 backdrop-blur-[2px]">
         <section role="dialog" aria-modal="true" aria-labelledby="confirm-ballot-title" className="my-auto w-full max-w-lg border border-[#d9e0db] bg-white p-6 shadow-2xl sm:p-9">
-          <p className="text-xs font-bold uppercase tracking-[0.18em] text-[#005a36]">Final confirmation</p>
-          <h2 id="confirm-ballot-title" className="display-font mt-3 text-3xl">Verify your ballot</h2>
-          <p className="mt-3 text-sm leading-6 text-[#66736b]">Enter your LRN and the OTP provided by the election board. Your choices cannot be changed after submission.</p>
+          <p className="text-xs font-bold uppercase tracking-[0.18em] text-[#005a36]">Ballot verification</p>
+          <h2 id="confirm-ballot-title" className="display-font mt-3 text-3xl">Confirm your vote</h2>
+          <p className="mt-3 text-sm leading-6 text-[#66736b]">Enter your Student ID and the 6-digit OTP provided by the election board. Your choices cannot be changed after submission.</p>
           <form className="mt-6 space-y-4" onSubmit={(event) => {
             event.preventDefault();
             setError("");
             startTransition(async () => {
               const result = await submitBallot({ lrn, otp, votes: Object.entries(selected).map(([position, candidate_id]) => ({ candidate_id, position })) });
               if (result.error) { setError(result.error); return; }
-              setIsModalOpen(false);
+              setIsOtpOpen(false);
               router.refresh();
             });
           }}>
             <div>
-              <label htmlFor="confirm-lrn" className="mb-2 block text-sm font-semibold">Learner Reference Number</label>
-              <input id="confirm-lrn" inputMode="numeric" autoComplete="off" required value={lrn} onChange={(event) => setLrn(event.target.value)} className="h-12 w-full border border-[#cfd8d1] bg-white px-3 text-sm outline-none focus:border-[#005a36] focus:ring-2 focus:ring-[#005a36]/15" />
+              <label htmlFor="confirm-lrn" className="mb-2 block text-sm font-semibold">Student ID</label>
+              <input id="confirm-lrn" inputMode="numeric" autoComplete="off" placeholder="Enter your Student ID" required value={lrn} onChange={(event) => setLrn(event.target.value)} className="h-12 w-full border border-[#cfd8d1] bg-white px-3 text-sm outline-none focus:border-[#005a36] focus:ring-2 focus:ring-[#005a36]/15" />
             </div>
             <div>
-              <label htmlFor="confirm-otp" className="mb-2 block text-sm font-semibold">One-time password</label>
-              <input id="confirm-otp" autoComplete="one-time-code" required value={otp} onChange={(event) => setOtp(event.target.value)} className="h-12 w-full border border-[#cfd8d1] bg-white px-3 text-sm outline-none focus:border-[#005a36] focus:ring-2 focus:ring-[#005a36]/15" />
+              <label htmlFor="confirm-otp" className="mb-2 block text-sm font-semibold">6-digit one-time password</label>
+              <input id="confirm-otp" inputMode="numeric" autoComplete="one-time-code" placeholder="000000" maxLength={6} pattern="[0-9]{6}" required value={otp} onChange={(event) => setOtp(event.target.value.replace(/\D/g, "").slice(0, 6))} className="h-12 w-full border border-[#cfd8d1] bg-white px-3 text-sm tabular-nums tracking-[0.3em] outline-none focus:border-[#005a36] focus:ring-2 focus:ring-[#005a36]/15" />
             </div>
             {error && <p role="alert" className="text-sm leading-5 text-[#8c3328]">{error}</p>}
             <div className="flex flex-col-reverse gap-3 pt-2 sm:flex-row sm:justify-end">
-              <button type="button" onClick={() => setIsModalOpen(false)} className="h-11 border border-[#cfd8d1] px-4 text-sm font-semibold">Back to ballot</button>
+              <button type="button" onClick={() => { setIsOtpOpen(false); setIsReviewOpen(true); }} className="h-11 border border-[#cfd8d1] px-4 text-sm font-semibold">Back to ballot review</button>
               <button type="submit" disabled={isPending} className="h-11 bg-[#005a36] px-5 text-sm font-bold text-white hover:bg-[#003d28] disabled:cursor-wait disabled:opacity-60">{isPending ? "Submitting…" : "Confirm vote"}</button>
             </div>
           </form>

@@ -44,7 +44,7 @@ export default function SiteHeader({ studentId, studentName, hasVoted = false }:
     <header className="bg-[#005a36] text-white shadow-[0_2px_12px_rgba(0,61,40,0.14)]">
       <div className="mx-auto flex min-h-16 max-w-7xl items-center justify-between gap-4 px-4 sm:px-8">
         <Link href="/candidates" className="flex shrink-0 items-center gap-2.5" aria-label="NDKC SSLG home">
-          <span className="grid size-9 place-items-center border border-white/60 text-[10px] font-bold tracking-wide">NDKC</span>
+          <span aria-hidden="true" className="school-logo-placeholder grid size-9 place-items-center border border-white/60 text-[10px] font-bold tracking-wide">NDKC</span>
           <span className="hidden text-xs font-bold uppercase tracking-[0.13em] sm:block">SSLG E-Voting</span>
         </Link>
         <nav aria-label="Main navigation" className="flex items-center gap-1 sm:gap-3">

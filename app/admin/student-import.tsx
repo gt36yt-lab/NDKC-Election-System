@@ -59,7 +59,7 @@ export default function StudentImport({ onImported }: { onImported: (students: A
   function downloadCredentials() {
     if (credentials.length === 0) return;
     const lines = [
-      ["lrn", "full_name", "assigned_password", "otp"].join(","),
+      ["student_id", "full_name", "assigned_password", "otp"].join(","),
       ...credentials.map((item) => [item.lrn, item.full_name, item.assigned_password, item.otp].map(csvCell).join(",")),
     ];
     const url = URL.createObjectURL(new Blob([lines.join("\r\n")], { type: "text/csv;charset=utf-8" }));
@@ -77,7 +77,7 @@ export default function StudentImport({ onImported }: { onImported: (students: A
       <div className="flex flex-wrap items-start justify-between gap-4">
         <div>
           <h2 id="student-import-title" className="text-sm font-bold">Import students</h2>
-          <p className="mt-1 text-xs leading-5 text-[#66736b]">CSV headers: lrn, full_name, grade_level, section. The section column is optional; missing values default to General.</p>
+          <p className="mt-1 text-xs leading-5 text-[#66736b]">CSV headers: student_id, full_name, grade_level, section. The section column is optional; missing values default to General. Existing CSV files with the legacy ID column are also supported.</p>
         </div>
         {credentials.length > 0 && <button type="button" onClick={downloadCredentials} className="inline-flex h-10 items-center gap-2 bg-[#005a36] px-4 text-xs font-bold text-white hover:bg-[#003d28]"><Download aria-hidden="true" className="size-4" />Download credentials ({credentials.length})</button>}
       </div>
