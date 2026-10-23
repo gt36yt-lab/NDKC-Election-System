@@ -4,7 +4,7 @@ import { useState } from "react";
 import { Download, Upload } from "lucide-react";
 import type { AdminStudent } from "./dashboard";
 
-type Credential = { id: string; lrn: string; full_name: string; grade_level: number; section: string; assigned_password: string; otp: string };
+type Credential = { id: string; lrn: string; full_name: string; email: string; grade_level: number; section: string; assigned_password: string; otp: string };
 type ImportError = { lrn: string; error: string };
 
 function csvCell(value: string) {
@@ -40,6 +40,7 @@ export default function StudentImport({ onImported }: { onImported: (students: A
         id: item.id,
         lrn: item.lrn,
         full_name: item.full_name,
+        email: item.email,
         grade_level: item.grade_level,
         section: item.section,
         otp_code: item.otp,
@@ -59,8 +60,8 @@ export default function StudentImport({ onImported }: { onImported: (students: A
   function downloadCredentials() {
     if (credentials.length === 0) return;
     const lines = [
-      ["student_id", "full_name", "assigned_password", "otp"].join(","),
-      ...credentials.map((item) => [item.lrn, item.full_name, item.assigned_password, item.otp].map(csvCell).join(",")),
+      ["student_id", "full_name", "email", "assigned_password", "otp"].join(","),
+      ...credentials.map((item) => [item.lrn, item.full_name, item.email, item.assigned_password, item.otp].map(csvCell).join(",")),
     ];
     const url = URL.createObjectURL(new Blob([lines.join("\r\n")], { type: "text/csv;charset=utf-8" }));
     const link = document.createElement("a");
@@ -72,14 +73,29 @@ export default function StudentImport({ onImported }: { onImported: (students: A
     window.setTimeout(() => URL.revokeObjectURL(url), 0);
   }
 
+  function downloadTemplate() {
+    const csv = "student_id,full_name,email,grade_level,section\r\n12345678,\"Doe, Jane\",jane.doe@example.com,7,Section A\r\n";
+    const url = URL.createObjectURL(new Blob([csv], { type: "text/csv;charset=utf-8" }));
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = "student-import-template.csv";
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    window.setTimeout(() => URL.revokeObjectURL(url), 0);
+  }
+
   return (
     <section className="mt-8 border-y border-[#cfd8d1] bg-white/80 px-5 py-5 sm:px-6" aria-labelledby="student-import-title">
       <div className="flex flex-wrap items-start justify-between gap-4">
         <div>
           <h2 id="student-import-title" className="text-sm font-bold">Import students</h2>
-          <p className="mt-1 text-xs leading-5 text-[#66736b]">CSV headers: student_id, full_name, grade_level, section. The section column is optional; missing values default to General. Existing CSV files with the legacy ID column are also supported.</p>
+          <p className="mt-1 text-xs leading-5 text-[#66736b]">Required CSV headers: student_id, full_name, email, grade_level, section. Download the template to get started.</p>
         </div>
-        {credentials.length > 0 && <button type="button" onClick={downloadCredentials} className="inline-flex h-10 items-center gap-2 bg-[#005a36] px-4 text-xs font-bold text-white hover:bg-[#003d28]"><Download aria-hidden="true" className="size-4" />Download credentials ({credentials.length})</button>}
+        <div className="flex flex-wrap gap-2">
+          <button type="button" onClick={downloadTemplate} className="inline-flex h-10 items-center gap-2 border border-[#cfd8d1] px-4 text-xs font-bold hover:border-[#005a36] hover:text-[#005a36]"><Download aria-hidden="true" className="size-4" />Download CSV template</button>
+          {credentials.length > 0 && <button type="button" onClick={downloadCredentials} className="inline-flex h-10 items-center gap-2 bg-[#005a36] px-4 text-xs font-bold text-white hover:bg-[#003d28]"><Download aria-hidden="true" className="size-4" />Download credentials ({credentials.length})</button>}
+        </div>
       </div>
       <form onSubmit={(event) => void importStudents(event)} className="mt-4 flex flex-col gap-3 sm:flex-row sm:items-center">
         <label htmlFor="student-csv" className="sr-only">Choose student CSV</label>

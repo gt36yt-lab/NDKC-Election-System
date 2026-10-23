@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
+import { sortPositions } from "@/lib/position-order";
 
 export type VoteRow = { candidate_id: string; position: string };
 export type ResultCandidate = {
@@ -56,7 +57,7 @@ export default function LiveResults({ candidates, initialVotes }: { candidates: 
         <p className="mt-6 border-y border-[#d9e0db] bg-white/80 px-5 py-8 text-sm text-[#66736b]">No candidates have been published yet.</p>
       ) : (
         <div className="mt-6 space-y-10">
-          {[...positions.entries()].map(([position, positionCandidates]) => {
+          {sortPositions([...positions.entries()]).map(([position, positionCandidates]) => {
             const positionVotes = votes.filter((vote) => vote.position === position);
             const total = positionVotes.length;
             return (

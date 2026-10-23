@@ -1,6 +1,7 @@
 "use server";
 
 import { createClient } from "@/lib/supabase/server";
+import { candidateMatchesGrade, isMultipleSelectionPosition } from "@/lib/position-order";
 
 type SubmittedVote = { candidate_id: string; position: string };
 
@@ -32,12 +33,22 @@ export async function submitBallot(input: { lrn: string; otp: string; votes: Sub
   if (candidateError || !candidates) return { error: "Candidate eligibility could not be verified." };
 
   const gradeLevel = Number(student.grade_level);
-  const eligibleCandidates = candidates.filter((candidate) => candidate.allowed_grade_levels?.includes(gradeLevel) ?? true);
+  const eligibleCandidates = candidates.filter((candidate) => candidateMatchesGrade(candidate, gradeLevel));
   const eligiblePositions = new Set(eligibleCandidates.map((candidate) => candidate.position));
-  const submittedPositions = new Set(input.votes.map((vote) => vote.position));
-  if (submittedPositions.size !== input.votes.length) return { error: "Select only one candidate for each position." };
-  if (submittedPositions.size !== eligiblePositions.size || [...eligiblePositions].some((position) => !submittedPositions.has(position))) {
-    return { error: "Select one candidate for every position on your ballot." };
+  const submittedByPosition = new Map<string, SubmittedVote[]>();
+  for (const vote of input.votes) {
+    const group = submittedByPosition.get(vote.position) ?? [];
+    group.push(vote);
+    submittedByPosition.set(vote.position, group);
+  }
+  for (const [position, positionVotes] of submittedByPosition) {
+    const maxSelections = isMultipleSelectionPosition(position) ? 2 : 1;
+    if (positionVotes.length > maxSelections) return { error: `${position} allows up to ${maxSelections} selections.` };
+    if (!eligiblePositions.has(position)) return { error: "Your ballot contains a position that is not eligible for your grade." };
+  }
+  const requiredPositions = [...eligiblePositions].filter((position) => !isMultipleSelectionPosition(position));
+  if (requiredPositions.some((position) => !submittedByPosition.has(position))) {
+    return { error: "Select one candidate for every required position on your ballot." };
   }
 
   const validVotes = input.votes.every((vote) => {

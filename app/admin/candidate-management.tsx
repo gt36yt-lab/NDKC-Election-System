@@ -2,13 +2,14 @@
 
 import { useState } from "react";
 import { Trash2 } from "lucide-react";
+import { comparePositions } from "@/lib/position-order";
 import type { AdminCandidate, AdminParty } from "./dashboard";
 
 const GRADES = [7, 8, 9, 10, 11, 12];
 const fieldClass = "h-11 w-full border border-[#cfd8d1] bg-white px-3 text-sm outline-none focus:border-[#005a36] focus:ring-2 focus:ring-[#005a36]/15";
 
 export default function CandidateManagement({ initialCandidates, initialParties }: { initialCandidates: AdminCandidate[]; initialParties: AdminParty[] }) {
-  const [candidates, setCandidates] = useState(initialCandidates);
+  const [candidates, setCandidates] = useState(() => [...initialCandidates].sort((left, right) => comparePositions(left.position, right.position) || left.full_name.localeCompare(right.full_name)));
   const [parties, setParties] = useState(initialParties);
   const [selectedGrades, setSelectedGrades] = useState<number[]>(GRADES);
   const [isSaving, setIsSaving] = useState(false);
@@ -36,7 +37,7 @@ export default function CandidateManagement({ initialCandidates, initialParties 
       });
       const result = await response.json() as { candidate?: AdminCandidate; error?: string };
       if (!response.ok || !result.candidate) throw new Error(result.error ?? "Candidate could not be created.");
-      setCandidates((current) => [...current, result.candidate!].sort((left, right) => left.position.localeCompare(right.position) || left.full_name.localeCompare(right.full_name)));
+      setCandidates((current) => [...current, result.candidate!].sort((left, right) => comparePositions(left.position, right.position) || left.full_name.localeCompare(right.full_name)));
       formElement.reset();
       setSelectedGrades(GRADES);
       setNotice("Candidate added.");

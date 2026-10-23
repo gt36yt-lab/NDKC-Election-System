@@ -12,7 +12,7 @@ export default function LoginPage() {
             <div className="absolute -bottom-24 -left-12 h-80 w-80 rounded-full border border-white/30" />
           </div>
           <div className="relative flex items-center gap-3">
-            <div aria-hidden="true" className="school-logo-placeholder grid size-12 place-items-center border border-white/60 text-sm font-bold tracking-wide">NDKC</div>
+            <div role="img" aria-label="Notre Dame of Kidapawan College logo" className="school-logo-placeholder grid size-12 place-items-center border border-white/60" />
             <div className="text-xs font-semibold uppercase tracking-[0.16em] text-white/80">Student elections</div>
           </div>
           <div className="relative max-w-lg py-10">

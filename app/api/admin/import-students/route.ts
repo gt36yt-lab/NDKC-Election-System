@@ -44,20 +44,34 @@ export async function POST(request: Request) {
   if (students.length > MAX_STUDENTS) return NextResponse.json({ error: `Import is limited to ${MAX_STUDENTS} students per file.` }, { status: 400 });
 
   const lrnSet = new Set<string>();
+  const emailSet = new Set<string>();
   for (const student of students) {
     if (lrnSet.has(student.lrn)) return NextResponse.json({ error: `Student ID ${student.lrn} appears more than once in the CSV.` }, { status: 400 });
     lrnSet.add(student.lrn);
+    const normalizedEmail = student.email.toLowerCase();
+    if (emailSet.has(normalizedEmail)) return NextResponse.json({ error: `Email ${student.email} appears more than once in the CSV.` }, { status: 400 });
+    emailSet.add(normalizedEmail);
   }
 
   const admin = createAdminClient();
   const { data: existingStudents, error: existingError } = await admin
     .from("students")
-    .select("id, lrn, has_voted, has_agreed_terms")
+    .select("id, lrn, email, has_voted, has_agreed_terms")
     .in("lrn", students.map((student) => student.lrn));
   if (existingError) return NextResponse.json({ error: "Existing student records could not be checked." }, { status: 500 });
 
   const existingByLrn = new Map((existingStudents ?? []).map((student) => [String(student.lrn), student]));
-  const credentials: { id: string; lrn: string; full_name: string; grade_level: number; section: string; assigned_password: string; otp: string }[] = [];
+  const { data: emailMatches, error: emailLookupError } = await admin.from("students").select("lrn, email").in("email", students.map((student) => student.email));
+  if (emailLookupError) return NextResponse.json({ error: "Existing student email addresses could not be checked." }, { status: 500 });
+  const existingEmailToStudentId = new Map((emailMatches ?? []).map((student) => [String(student.email).toLowerCase(), String(student.lrn)]));
+  for (const student of students) {
+    const existingId = existingEmailToStudentId.get(student.email.toLowerCase());
+    if (existingId && existingId !== student.lrn) {
+      return NextResponse.json({ error: `Email ${student.email} is already assigned to another student.` }, { status: 409 });
+    }
+  }
+
+  const credentials: { id: string; lrn: string; full_name: string; email: string; grade_level: number; section: string; assigned_password: string; otp: string }[] = [];
   const errors: { lrn: string; error: string }[] = [];
 
   for (const student of students) {
@@ -68,7 +82,7 @@ export async function POST(request: Request) {
       email,
       password: assignedPassword,
       email_confirm: true,
-      user_metadata: { lrn: student.lrn, full_name: student.full_name },
+      user_metadata: { lrn: student.lrn, full_name: student.full_name, registered_email: student.email },
     });
 
     let userId = created.user?.id;
@@ -97,7 +111,7 @@ export async function POST(request: Request) {
       const { error: updateAuthError } = await admin.auth.admin.updateUserById(existingUserId, {
         password: assignedPassword,
         email_confirm: true,
-        user_metadata: { lrn: student.lrn, full_name: student.full_name },
+        user_metadata: { lrn: student.lrn, full_name: student.full_name, registered_email: student.email },
       });
       if (updateAuthError) {
         errors.push({ lrn: student.lrn, error: "Existing Auth account could not be updated with the generated password." });
@@ -116,6 +130,7 @@ export async function POST(request: Request) {
       id: userId,
       lrn: student.lrn,
       full_name: student.full_name,
+      email: student.email,
       grade_level: student.grade_level,
       section: student.section,
       otp_code: otp,
@@ -129,7 +144,7 @@ export async function POST(request: Request) {
       continue;
     }
 
-    credentials.push({ id: userId, lrn: student.lrn, full_name: student.full_name, grade_level: student.grade_level, section: student.section, assigned_password: assignedPassword, otp });
+    credentials.push({ id: userId, lrn: student.lrn, full_name: student.full_name, email: student.email, grade_level: student.grade_level, section: student.section, assigned_password: assignedPassword, otp });
   }
 
   return NextResponse.json({ imported: credentials.length, credentials, errors });

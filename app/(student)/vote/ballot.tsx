@@ -2,6 +2,7 @@
 
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
+import { isMultipleSelectionPosition, sortPositions } from "@/lib/position-order";
 import { submitBallot } from "./actions";
 
 type Candidate = {
@@ -27,7 +28,7 @@ export default function Ballot({
   savedVotes: SavedVote[];
 }) {
   const router = useRouter();
-  const [selected, setSelected] = useState<Record<string, string>>({});
+  const [selected, setSelected] = useState<Record<string, string[]>>({});
   const [lrn, setLrn] = useState("");
   const [otp, setOtp] = useState("");
   const [isReviewOpen, setIsReviewOpen] = useState(false);
@@ -40,7 +41,9 @@ export default function Ballot({
     group.push(candidate);
     groups.set(candidate.position, group);
   }
-  const hasCompleteSelection = [...groups.keys()].every((position) => Boolean(selected[position]));
+  const hasCompleteSelection = [...groups.keys()].every((position) =>
+    isMultipleSelectionPosition(position) || Boolean(selected[position]?.length),
+  );
 
   if (hasVoted) {
     return (
@@ -65,13 +68,30 @@ export default function Ballot({
         <p className="mt-8 border-y border-[#d9e0db] bg-white/80 px-5 py-8 text-sm text-[#66736b]">No eligible candidates are available for your grade.</p>
       ) : (
         <div className="mt-10 space-y-10">
-          {[...groups.entries()].map(([position, positionCandidates]) => (
+          {sortPositions([...groups.entries()]).map(([position, positionCandidates]) => (
             <fieldset key={position} className="border-y border-[#d9e0db] bg-white/80 px-5 py-6 sm:px-8">
               <legend className="display-font px-2 text-2xl">{position}</legend>
+              {isMultipleSelectionPosition(position) && <p className="mt-2 text-xs text-[#66736b]">Choose up to two candidates.</p>}
               <div className="divide-y divide-[#e5eae6]">
                 {positionCandidates.map((candidate) => (
                   <label key={candidate.id} className="flex cursor-pointer items-start gap-4 py-5">
-                    <input type="radio" name={`position-${position}`} value={candidate.id} checked={selected[position] === candidate.id} onChange={() => setSelected((current) => ({ ...current, [position]: candidate.id }))} className="mt-1 size-4 shrink-0 accent-[#005a36]" />
+                    <input
+                      type={isMultipleSelectionPosition(position) ? "checkbox" : "radio"}
+                      name={`position-${position}`}
+                      value={candidate.id}
+                      checked={selected[position]?.includes(candidate.id) ?? false}
+                      disabled={isMultipleSelectionPosition(position) && (selected[position]?.length ?? 0) >= 2 && !selected[position]?.includes(candidate.id)}
+                      onChange={() => setSelected((current) => {
+                        const currentSelection = current[position] ?? [];
+                        const nextSelection = isMultipleSelectionPosition(position)
+                          ? currentSelection.includes(candidate.id)
+                            ? currentSelection.filter((id) => id !== candidate.id)
+                            : currentSelection.length < 2 ? [...currentSelection, candidate.id] : currentSelection
+                          : [candidate.id];
+                        return { ...current, [position]: nextSelection };
+                      })}
+                      className="mt-1 size-4 shrink-0 accent-[#005a36]"
+                    />
                     <span className="min-w-0">
                       <span className="block font-semibold">{candidate.full_name}</span>
                       <span className="mt-1 block text-xs font-bold uppercase tracking-wide text-[#005a36]">{candidate.party_id ? partyNames[candidate.party_id] ?? "Party affiliation unavailable" : "Independent"}</span>
@@ -91,12 +111,14 @@ export default function Ballot({
           <h2 id="review-ballot-title" className="display-font mt-3 text-3xl">Check your choices</h2>
           <p className="mt-3 text-sm leading-6 text-[#66736b]">Review your selection for each position. Your choices cannot be changed after submission.</p>
           <ul className="mt-5 divide-y divide-[#e5eae6] border-y border-[#d9e0db]">
-            {[...groups.entries()].map(([position, positionCandidates]) => {
-              const candidate = positionCandidates.find((item) => item.id === selected[position]);
+            {sortPositions([...groups.entries()]).map(([position, positionCandidates]) => {
+              const positionSelection = positionCandidates.filter((item) => selected[position]?.includes(item.id));
               return (
                 <li key={position} className="py-3 text-sm">
                   <span className="font-semibold">{position}:</span>{" "}
-                  {candidate ? candidate.full_name : <span className="italic text-[#66736b]">No selection</span>}
+                  {positionSelection.length > 0
+                    ? positionSelection.map((candidate) => candidate.full_name).join(", ")
+                    : <span className="italic text-[#66736b]">No selection</span>}
                 </li>
               );
             })}
@@ -117,7 +139,7 @@ export default function Ballot({
             event.preventDefault();
             setError("");
             startTransition(async () => {
-              const result = await submitBallot({ lrn, otp, votes: Object.entries(selected).map(([position, candidate_id]) => ({ candidate_id, position })) });
+              const result = await submitBallot({ lrn, otp, votes: Object.entries(selected).flatMap(([position, candidateIds]) => candidateIds.map((candidate_id) => ({ candidate_id, position }))) });
               if (result.error) { setError(result.error); return; }
               setIsOtpOpen(false);
               router.refresh();
@@ -125,7 +147,7 @@ export default function Ballot({
           }}>
             <div>
               <label htmlFor="confirm-lrn" className="mb-2 block text-sm font-semibold">Student ID</label>
-              <input id="confirm-lrn" inputMode="numeric" autoComplete="off" placeholder="Enter your Student ID" required value={lrn} onChange={(event) => setLrn(event.target.value)} className="h-12 w-full border border-[#cfd8d1] bg-white px-3 text-sm outline-none focus:border-[#005a36] focus:ring-2 focus:ring-[#005a36]/15" />
+              <input id="confirm-lrn" inputMode="numeric" autoComplete="off" placeholder="8-digit Student ID" pattern="[0-9]{8}" maxLength={8} required value={lrn} onChange={(event) => setLrn(event.target.value.replace(/\D/g, "").slice(0, 8))} className="h-12 w-full border border-[#cfd8d1] bg-white px-3 text-sm outline-none focus:border-[#005a36] focus:ring-2 focus:ring-[#005a36]/15" />
             </div>
             <div>
               <label htmlFor="confirm-otp" className="mb-2 block text-sm font-semibold">6-digit one-time password</label>

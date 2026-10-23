@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { isSupabaseConfigured } from "@/lib/supabase/config";
 import { createClient } from "@/lib/supabase/client";
@@ -21,6 +22,10 @@ export default function LoginForm() {
 
     if (!isSupabaseConfigured()) {
       setError("The student portal is not configured yet. Add the Supabase URL and public key to .env.local.");
+      return;
+    }
+    if (!/^\d{8}$/.test(lrn.trim())) {
+      setError("Student ID must be exactly 8 digits.");
       return;
     }
 
@@ -44,9 +49,10 @@ export default function LoginForm() {
 
   return (
     <form className="mt-8 space-y-5" onSubmit={handleSubmit}>
+      {searchParams.get("registered") === "1" && <p role="status" className="border-l-2 border-[#005a36] bg-[#e5f0e9] px-3 py-2 text-sm leading-5 text-[#174b32]">Your account was created successfully. Sign in with your Student ID and password.</p>}
       <div>
         <label htmlFor="lrn" className="mb-2 block text-sm font-semibold">Student ID</label>
-        <input id="lrn" inputMode="numeric" autoComplete="username" placeholder="Enter your Student ID" required value={lrn} onChange={(event) => setLrn(event.target.value)} className="h-12 w-full rounded-sm border border-[#cfd8d1] bg-white px-3 text-sm outline-none transition focus:border-[#005a36] focus:ring-2 focus:ring-[#005a36]/15" />
+        <input id="lrn" inputMode="numeric" autoComplete="username" placeholder="8-digit Student ID" pattern="[0-9]{8}" maxLength={8} required value={lrn} onChange={(event) => setLrn(event.target.value.replace(/\D/g, "").slice(0, 8))} className="h-12 w-full rounded-sm border border-[#cfd8d1] bg-white px-3 text-sm outline-none transition focus:border-[#005a36] focus:ring-2 focus:ring-[#005a36]/15" />
       </div>
       <div>
         <label htmlFor="password" className="mb-2 block text-sm font-semibold">Assigned password</label>
@@ -57,6 +63,7 @@ export default function LoginForm() {
         {isLoading ? "Signing in…" : "Sign in"}
       </button>
       <p className="text-center text-xs leading-5 text-[#66736b]">Your account is issued by the school election board.</p>
+      <p className="text-center text-sm text-[#66736b]">Need an account? <Link href="/register" className="font-semibold text-[#005a36] underline">Register here</Link></p>
     </form>
   );
 }

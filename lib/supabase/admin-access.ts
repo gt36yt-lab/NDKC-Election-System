@@ -5,7 +5,7 @@ import { createClient } from "@/lib/supabase/server";
 const STUDENT_EMAIL_DOMAIN = "@students.ndkc.invalid";
 
 export type AdminAccess =
-  | { status: "authorized"; lrn: string }
+  | { status: "authorized"; lrn: string; userId: string }
   | { status: "unauthenticated" | "forbidden" | "not-configured" };
 
 export async function getAdminAccess(): Promise<AdminAccess> {
@@ -26,7 +26,7 @@ export async function getAdminAccess(): Promise<AdminAccess> {
   if (!email.endsWith(STUDENT_EMAIL_DOMAIN)) return { status: "forbidden" };
   const lrn = email.slice(0, -STUDENT_EMAIL_DOMAIN.length);
   if (!allowedLrns.includes(lrn)) return { status: "forbidden" };
-  return { status: "authorized", lrn };
+  return { status: "authorized", lrn, userId: user.id };
 }
 
 export function isAdminServiceConfigured() {

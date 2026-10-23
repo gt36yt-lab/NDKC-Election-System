@@ -1,4 +1,4 @@
-export type ImportedStudent = { lrn: string; full_name: string; grade_level: number; section: string };
+export type ImportedStudent = { lrn: string; full_name: string; email: string; grade_level: number; section: string };
 
 function parseCsvRows(text: string) {
   const rows: string[][] = [];
@@ -44,24 +44,28 @@ export function parseStudentCsv(text: string): ImportedStudent[] {
   if (rows.length < 2) throw new Error("CSV must contain a header row and at least one student.");
 
   const headers = rows[0].map((header) => header.trim().toLowerCase());
-  const lrnColumn = headers.indexOf("student_id") >= 0 ? headers.indexOf("student_id") : headers.indexOf("lrn");
+  const lrnColumn = headers.indexOf("student_id");
   const nameColumn = headers.indexOf("full_name");
+  const emailColumn = headers.indexOf("email");
   const gradeColumn = headers.indexOf("grade_level");
   const sectionColumn = headers.indexOf("section");
-  if ([lrnColumn, nameColumn, gradeColumn].some((column) => column === -1)) {
-    throw new Error("CSV headers must include student_id, full_name, and grade_level.");
+  if ([lrnColumn, nameColumn, emailColumn, gradeColumn, sectionColumn].some((column) => column === -1)) {
+    throw new Error("CSV headers must include student_id, full_name, email, grade_level, and section.");
   }
 
   return rows.slice(1).map((cells, index) => {
     const lrn = (cells[lrnColumn] ?? "").trim();
     const full_name = (cells[nameColumn] ?? "").trim();
+    const email = (cells[emailColumn] ?? "").trim().toLowerCase();
     const grade_level = Number((cells[gradeColumn] ?? "").trim());
-    const section = sectionColumn < 0 ? "General" : (cells[sectionColumn] ?? "").trim() || "General";
-    if (!/^\d+$/.test(lrn)) throw new Error(`Row ${index + 2}: Student ID must contain digits only.`);
+    const section = (cells[sectionColumn] ?? "").trim();
+    if (!/^\d{8}$/.test(lrn)) throw new Error(`Row ${index + 2}: Student ID must contain exactly 8 digits.`);
     if (!full_name) throw new Error(`Row ${index + 2}: full_name is required.`);
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) || email.length > 254) throw new Error(`Row ${index + 2}: a valid email is required.`);
     if (!Number.isInteger(grade_level) || grade_level < 7 || grade_level > 12) {
       throw new Error(`Row ${index + 2}: grade_level must be between 7 and 12.`);
     }
-    return { lrn, full_name, grade_level, section };
+    if (!section || section.length > 80) throw new Error(`Row ${index + 2}: section is required and must be 80 characters or fewer.`);
+    return { lrn, full_name, email, grade_level, section };
   });
 }

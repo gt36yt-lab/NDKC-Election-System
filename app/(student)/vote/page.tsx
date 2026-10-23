@@ -1,4 +1,5 @@
 import { createClient } from "@/lib/supabase/server";
+import { candidateMatchesGrade, schoolDivision } from "@/lib/position-order";
 import Ballot from "./ballot";
 
 type Candidate = {
@@ -30,9 +31,7 @@ export default async function VotePage() {
 
   const gradeLevel = Number(student.grade_level);
   const partyNames = new Map((parties ?? []).map((party: Party) => [party.id, party.name]));
-  const eligibleCandidates = ((candidates ?? []) as Candidate[]).filter((candidate) =>
-    candidate.allowed_grade_levels?.includes(gradeLevel) ?? true,
-  );
+  const eligibleCandidates = ((candidates ?? []) as Candidate[]).filter((candidate) => candidateMatchesGrade(candidate, gradeLevel));
   let savedVotes: SavedVote[] = [];
 
   if (student.has_voted && student.lrn) {
@@ -45,11 +44,14 @@ export default async function VotePage() {
       <p className="text-xs font-bold uppercase tracking-[0.18em] text-[#005a36]">Student ballot</p>
       <h1 className="display-font mt-3 text-4xl">Your vote matters.</h1>
       <p className="mt-3 max-w-2xl text-sm leading-6 text-[#66736b]">Review the candidates and their platforms before you make your choice. Your ballot is tailored to grade {student.grade_level}{student.section ? ` - ${student.section}` : ""}.</p>
-      {candidateError ? (
-        <p role="alert" className="mt-8 border-l-2 border-[#b84a3a] bg-white px-4 py-3 text-sm text-[#8c3328]">The ballot could not be loaded. Please try again later.</p>
-      ) : (
-        <Ballot candidates={eligibleCandidates} partyNames={Object.fromEntries(partyNames)} hasVoted={student.has_voted} savedVotes={savedVotes} />
-      )}
+      <section className="mt-6" aria-labelledby="vote-division-title">
+        <h2 id="vote-division-title" className="display-font text-2xl">{schoolDivision(gradeLevel)}</h2>
+        {candidateError ? (
+          <p role="alert" className="mt-8 border-l-2 border-[#b84a3a] bg-white px-4 py-3 text-sm text-[#8c3328]">The ballot could not be loaded. Please try again later.</p>
+        ) : (
+          <Ballot candidates={eligibleCandidates} partyNames={Object.fromEntries(partyNames)} hasVoted={student.has_voted} savedVotes={savedVotes} />
+        )}
+      </section>
     </main>
   );
 }
