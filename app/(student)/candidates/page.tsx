@@ -19,12 +19,22 @@ export default async function CandidatesPage() {
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return null;
 
-  const [{ data: student }, { data: candidates, error: candidateError }, { data: parties, error: partyError }] = await Promise.all([
-    supabase.from("students").select("grade_level").eq("id", user.id).maybeSingle(),
+  const [{ data: student, error: studentError }, { data: candidates, error: candidateError }, { data: parties, error: partyError }] = await Promise.all([
+    supabase.from("students").select("id, student_id, role, grade_level").eq("id", user.id).maybeSingle(),
     supabase.from("candidates").select("id, full_name, position, party_id, platform, image_url, allowed_grade_levels").order("full_name"),
     supabase.from("parties").select("id, name").order("name"),
   ]);
 
+  if (studentError) {
+    console.error("[CandidatesPage] Student profile lookup failed:", studentError);
+    return <main className="mx-auto max-w-3xl px-5 py-16 sm:px-8"><p role="alert" className="text-sm text-[#8c3328]">Your student profile could not be loaded. Please try again later.</p></main>;
+  }
+  if (!student) {
+    return <main className="mx-auto max-w-3xl px-5 py-16 sm:px-8"><p role="alert" className="text-sm text-[#8c3328]">Your student profile could not be found. Please contact the election board.</p></main>;
+  }
+
+  if (candidateError) console.error("[CandidatesPage] Candidate lookup failed:", candidateError);
+  if (partyError) console.error("[CandidatesPage] Party lookup failed:", partyError);
   const error = candidateError ?? partyError;
   const gradeLevel = Number(student?.grade_level);
   if (!Number.isInteger(gradeLevel) || gradeLevel < 7 || gradeLevel > 12) {

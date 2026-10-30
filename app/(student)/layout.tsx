@@ -29,11 +29,16 @@ export default async function StudentLayout({ children }: Readonly<{ children: R
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) redirect("/login?next=/candidates");
 
-  const { data: student } = await supabase
+  const { data: student, error: studentError } = await supabase
     .from("students")
     .select("full_name, grade_level, section, has_agreed_terms, has_voted")
     .eq("id", user.id)
     .maybeSingle();
+
+  if (studentError) {
+    console.error("[StudentLayout] Student profile lookup failed:", studentError);
+    return <><SiteHeader /><main className="mx-auto max-w-3xl px-5 py-16 sm:px-8"><h1 className="display-font text-3xl">Student profile could not be loaded</h1><p className="mt-3 text-sm leading-6 text-[#66736b]">Please try again later or contact the election board.</p></main></>;
+  }
 
   if (!student) {
     return <><SiteHeader /><main className="mx-auto max-w-3xl px-5 py-16 sm:px-8"><h1 className="display-font text-3xl">Student profile not found</h1><p className="mt-3 text-sm leading-6 text-[#66736b]">Ask the election board to verify that your student profile is linked to this sign-in account.</p></main></>;

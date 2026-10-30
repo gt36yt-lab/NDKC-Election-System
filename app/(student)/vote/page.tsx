@@ -19,11 +19,16 @@ export default async function VotePage() {
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return null;
 
-  const [{ data: student }, { data: candidates, error: candidateError }, { data: parties }] = await Promise.all([
+  const [{ data: student, error: studentError }, { data: candidates, error: candidateError }, { data: parties }] = await Promise.all([
     supabase.from("students").select("lrn, grade_level, section, has_voted").eq("id", user.id).maybeSingle(),
     supabase.from("candidates").select("id, full_name, position, party_id, platform, allowed_grade_levels").order("full_name"),
     supabase.from("parties").select("id, name"),
   ]);
+
+  if (studentError) {
+    console.error("[VotePage] Student profile lookup failed:", studentError);
+    return <main className="mx-auto max-w-3xl px-5 py-16 sm:px-8"><h1 className="display-font text-3xl">Student profile could not be loaded</h1><p className="mt-3 text-sm leading-6 text-[#66736b]">Please try again later or contact the election board.</p></main>;
+  }
 
   if (!student) {
     return <main className="mx-auto max-w-3xl px-5 py-16 sm:px-8"><h1 className="display-font text-3xl">Student profile not found</h1><p className="mt-3 text-sm leading-6 text-[#66736b]">Ask the election board to verify your student profile.</p></main>;
@@ -35,7 +40,7 @@ export default async function VotePage() {
   let savedVotes: SavedVote[] = [];
 
   if (student.has_voted && student.lrn) {
-    const { data: votes } = await supabase.from("votes").select("candidate_id, position").eq("student_lrn", student.lrn);
+    const { data: votes } = await supabase.rpc("get_my_votes");
     savedVotes = (votes ?? []) as SavedVote[];
   }
 

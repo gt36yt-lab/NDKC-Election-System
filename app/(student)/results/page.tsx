@@ -15,6 +15,7 @@ export default async function ResultsPage() {
     .maybeSingle();
 
   if (studentError || !student) {
+    if (studentError) console.error("[ResultsPage] Student profile lookup failed:", studentError);
     return (
       <main className="page-enter mx-auto max-w-7xl px-5 py-10 sm:px-8 sm:py-14">
         <p role="alert" className="border-l-2 border-[#b84a3a] bg-white px-4 py-3 text-sm text-[#8c3328]">
