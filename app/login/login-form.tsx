@@ -79,7 +79,7 @@ export default function LoginForm() {
       {searchParams.get("registered") === "1" && <p role="status" className="border-l-2 border-[#005a36] bg-[#e5f0e9] px-3 py-2 text-sm leading-5 text-[#174b32]">Registration received. Waiting for account to be approved.</p>}
       {searchParams.get("approval") === "pending" && <p role="alert" className="border-l-2 border-[#b78813] bg-[#fff8e4] px-3 py-2 text-sm leading-5 text-[#5c4a18]">Waiting for account to be approved.</p>}
       {searchParams.get("approval") === "rejected" && <p role="alert" className="border-l-2 border-[#b84a3a] bg-[#fbf0ee] px-3 py-2 text-sm leading-5 text-[#8c3328]">Your account registration was not approved. Please contact the election board.</p>}
-      {searchParams.get("approval") === "unavailable" && <p role="alert" className="border-l-2 border-[#b84a3a] bg-[#fbf0ee] px-3 py-2 text-sm leading-5 text-[#8c3328]">We couldn't verify your account status. Please contact the election board.</p>}
+      {searchParams.get("approval") === "unavailable" && <p role="alert" className="border-l-2 border-[#b84a3a] bg-[#fbf0ee] px-3 py-2 text-sm leading-5 text-[#8c3328]">We couldn&apos;t verify your account status. Please contact the election board.</p>}
       <div>
         <label htmlFor="lrn" className="mb-2 block text-sm font-semibold">Student ID</label>
         <input id="lrn" inputMode="numeric" autoComplete="username" placeholder="8-digit Student ID" pattern="[0-9]{8}" maxLength={8} required value={lrn} onChange={(event) => setLrn(event.target.value.replace(/\D/g, "").slice(0, 8))} className="h-12 w-full rounded-sm border border-[#cfd8d1] bg-white px-3 text-sm outline-none transition focus:border-[#005a36] focus:ring-2 focus:ring-[#005a36]/15" />
