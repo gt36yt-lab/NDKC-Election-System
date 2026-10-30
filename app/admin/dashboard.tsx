@@ -11,6 +11,7 @@ export type AdminStudent = {
   role: string;
   full_name: string;
   email: string | null;
+  status: string;
   grade_level: string | number;
   section: string | null;
   otp_code: string | null;
@@ -37,7 +38,7 @@ export default function AdminDashboard({ initialStudents, initialCandidates, ini
   const [editError, setEditError] = useState("");
   const [isSavingStudent, setIsSavingStudent] = useState(false);
   const [notice, setNotice] = useState("");
-  const [activeTab, setActiveTab] = useState<"students" | "candidates">("students");
+  const [activeTab, setActiveTab] = useState<"students" | "approvals" | "candidates">("students");
   const [gradeFilter, setGradeFilter] = useState("all");
   const [sectionFilter, setSectionFilter] = useState("all");
   const [votingStatusFilter, setVotingStatusFilter] = useState("all");
@@ -119,6 +120,54 @@ export default function AdminDashboard({ initialStudents, initialCandidates, ini
     }
   }
 
+  async function updateApproval(student: AdminStudent, status: "approved" | "rejected") {
+    if (resettingId || isSavingStudent) return;
+    if (status === "rejected" && !window.confirm(`Reject the registration for ${student.full_name}?`)) return;
+
+    setResettingId(student.id);
+    setNotice("");
+    try {
+      const response = await fetch("/api/admin/approve-student", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ studentId: student.id, status }),
+      });
+      const result = await response.json() as { error?: string };
+      if (!response.ok) throw new Error(result.error ?? "Registration status could not be updated.");
+      setStudents((current) => current.map((item) => item.id === student.id ? { ...item, status } : item));
+      setNotice(`${student.full_name}'s registration was ${status}.`);
+    } catch (cause) {
+      setNotice(cause instanceof Error ? cause.message : "Registration status could not be updated.");
+    } finally {
+      setResettingId(null);
+    }
+  }
+
+  async function approveAllPending() {
+    if (resettingId || isSavingStudent) return;
+    const pending = students.filter((student) => student.status === "pending");
+    if (pending.length === 0 || !window.confirm(`Approve all ${pending.length} pending registrations?`)) return;
+
+    setResettingId("all-pending");
+    setNotice("");
+    try {
+      const response = await fetch("/api/admin/approve-student", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ approveAll: true }),
+      });
+      const result = await response.json() as { studentIds?: string[]; error?: string };
+      if (!response.ok || !result.studentIds) throw new Error(result.error ?? "Pending registrations could not be approved.");
+      const approvedIds = new Set(result.studentIds);
+      setStudents((current) => current.map((student) => approvedIds.has(student.id) ? { ...student, status: "approved" } : student));
+      setNotice(`${result.studentIds.length} registration${result.studentIds.length === 1 ? " was" : "s were"} approved.`);
+    } catch (cause) {
+      setNotice(cause instanceof Error ? cause.message : "Pending registrations could not be approved.");
+    } finally {
+      setResettingId(null);
+    }
+  }
+
   async function saveStudent(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (!editingStudent || isSavingStudent) return;
@@ -185,6 +234,7 @@ export default function AdminDashboard({ initialStudents, initialCandidates, ini
 
       <div role="tablist" aria-label="Admin sections" className="mt-8 flex border-b border-[#cfd8d1]">
         <button type="button" role="tab" aria-selected={activeTab === "students"} onClick={() => setActiveTab("students")} className={`border-b-2 px-4 py-3 text-sm font-semibold ${activeTab === "students" ? "border-[#005a36] text-[#005a36]" : "border-transparent text-[#66736b]"}`}>Students</button>
+        <button type="button" role="tab" aria-selected={activeTab === "approvals"} onClick={() => setActiveTab("approvals")} className={`border-b-2 px-4 py-3 text-sm font-semibold ${activeTab === "approvals" ? "border-[#005a36] text-[#005a36]" : "border-transparent text-[#66736b]"}`}>Pending approvals <span className="ml-1 tabular-nums">{students.filter((student) => student.status === "pending").length}</span></button>
         <button type="button" role="tab" aria-selected={activeTab === "candidates"} onClick={() => setActiveTab("candidates")} className={`border-b-2 px-4 py-3 text-sm font-semibold ${activeTab === "candidates" ? "border-[#005a36] text-[#005a36]" : "border-transparent text-[#66736b]"}`}>Candidates &amp; parties</button>
       </div>
 
@@ -299,7 +349,33 @@ export default function AdminDashboard({ initialStudents, initialCandidates, ini
           </form>
         </section>
       </div>}
-      </> : <CandidateManagement initialCandidates={initialCandidates} initialParties={initialParties} />}
+      </> : activeTab === "approvals" ? <section className="mt-8" aria-labelledby="pending-approvals-title">
+        <div className="flex flex-wrap items-end justify-between gap-4 border-b border-[#cfd8d1] pb-4">
+          <div>
+            <h2 id="pending-approvals-title" className="display-font text-2xl">Pending registrations</h2>
+            <p className="mt-1 text-xs text-[#66736b]">{students.filter((student) => student.status === "pending").length} awaiting review</p>
+          </div>
+          <button type="button" disabled={resettingId !== null || isSavingStudent || !students.some((student) => student.status === "pending")} onClick={() => void approveAllPending()} className="h-10 border border-[#005a36] bg-[#005a36] px-4 text-xs font-bold text-white transition hover:bg-[#003d28] disabled:cursor-not-allowed disabled:opacity-50">{resettingId === "all-pending" ? "Approving…" : "Batch approve all"}</button>
+        </div>
+        {notice && <p role="status" className="border-b border-[#d9e0db] bg-[#e5f0e9] px-4 py-3 text-sm text-[#174b32]">{notice}</p>}
+        <div className="overflow-x-auto">
+          <table className="w-full min-w-[760px] border-collapse text-left text-sm">
+            <thead><tr className="border-b border-[#cfd8d1] text-xs uppercase tracking-wide text-[#66736b]"><th scope="col" className="px-3 py-3 font-bold">Student ID</th><th scope="col" className="px-3 py-3 font-bold">Full name</th><th scope="col" className="px-3 py-3 font-bold">Email</th><th scope="col" className="px-3 py-3 font-bold">Grade / Section</th><th scope="col" className="px-3 py-3 text-right font-bold">Review</th></tr></thead>
+            <tbody>
+              {students.filter((student) => student.status === "pending").map((student) => (
+                <tr key={student.id} className="border-b border-[#e5eae6] bg-white/70">
+                  <td className="whitespace-nowrap px-3 py-3 font-mono text-xs">{student.lrn}</td>
+                  <td className="px-3 py-3 font-medium">{student.full_name}</td>
+                  <td className="px-3 py-3">{student.email || "—"}</td>
+                  <td className="px-3 py-3">{student.grade_level} / {student.section || "General"}</td>
+                  <td className="px-3 py-3"><div className="flex justify-end gap-2"><button type="button" disabled={resettingId !== null || isSavingStudent} onClick={() => void updateApproval(student, "approved")} className="h-9 border border-[#005a36] bg-[#005a36] px-3 text-xs font-semibold text-white hover:bg-[#003d28] disabled:cursor-wait disabled:opacity-50">{resettingId === student.id ? "Saving…" : "Approve"}</button><button type="button" disabled={resettingId !== null || isSavingStudent} onClick={() => void updateApproval(student, "rejected")} className="h-9 border border-[#b84a3a] px-3 text-xs font-semibold text-[#8c3328] hover:bg-[#fbf0ee] disabled:cursor-wait disabled:opacity-50">Reject</button></div></td>
+                </tr>
+              ))}
+              {!students.some((student) => student.status === "pending") && <tr><td colSpan={5} className="px-3 py-10 text-center text-sm text-[#66736b]">No registrations are waiting for approval.</td></tr>}
+            </tbody>
+          </table>
+        </div>
+      </section> : <CandidateManagement initialCandidates={initialCandidates} initialParties={initialParties} />}
     </main>
   );
 }

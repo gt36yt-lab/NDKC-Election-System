@@ -56,7 +56,7 @@ export async function POST(request: Request) {
   const admin = createAdminClient();
   const { data: existingStudents, error: existingError } = await admin
     .from("students")
-    .select("id, lrn, email, has_voted, has_agreed_terms")
+    .select("id, lrn, email, has_voted, has_agreed_terms, status")
     .in("lrn", students.map((student) => student.lrn));
   if (existingError) return NextResponse.json({ error: "Existing student records could not be checked." }, { status: 500 });
 
@@ -136,6 +136,7 @@ export async function POST(request: Request) {
       otp_code: otp,
       has_agreed_terms: existingStudent?.has_agreed_terms ?? false,
       has_voted: existingStudent?.has_voted ?? false,
+      status: existingStudent?.status ?? "approved",
     }, { onConflict: "lrn" });
 
     if (upsertError) {

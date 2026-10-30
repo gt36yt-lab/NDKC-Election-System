@@ -36,7 +36,7 @@ export async function PUT(request: Request, { params }: { params: Promise<{ id: 
 
   const { id } = await params;
   const admin = createAdminClient();
-  const { data: current, error: currentError } = await admin.from("students").select("id, lrn, full_name, email, grade_level, section, otp_code, has_voted").eq("id", id).maybeSingle();
+  const { data: current, error: currentError } = await admin.from("students").select("id, lrn, role, status, full_name, email, grade_level, section, otp_code, has_voted").eq("id", id).maybeSingle();
   if (currentError) return NextResponse.json({ error: "Student record could not be loaded." }, { status: 500 });
   if (!current) return NextResponse.json({ error: "Student not found." }, { status: 404 });
 
@@ -84,7 +84,7 @@ export async function PUT(request: Request, { params }: { params: Promise<{ id: 
     email,
     grade_level: gradeLevel,
     section,
-  }).eq("id", id).select("id, lrn, role, full_name, email, grade_level, section, otp_code, has_voted").maybeSingle();
+  }).eq("id", id).select("id, lrn, role, status, full_name, email, grade_level, section, otp_code, has_voted").maybeSingle();
 
   if (updateError || !updated) {
     const { error: voteRollbackError } = studentId !== current.lrn

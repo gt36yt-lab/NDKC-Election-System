@@ -63,7 +63,7 @@ export async function POST(request: Request) {
     email: authEmail,
     password,
     email_confirm: true,
-    user_metadata: { lrn: studentId, full_name: fullName, registered_email: email },
+    user_metadata: { lrn: studentId, full_name: fullName, registered_email: email, status: "pending" },
   });
   if (authError || !authResult.user) {
     return NextResponse.json({ error: "An account could not be created for this Student ID. It may already be registered." }, { status: 409 });
@@ -79,6 +79,7 @@ export async function POST(request: Request) {
     otp_code: otp,
     has_voted: false,
     has_agreed_terms: false,
+    status: "pending",
   });
 
   if (studentError) {

@@ -44,6 +44,7 @@ export default function StudentImport({ onImported }: { onImported: (students: A
         email: item.email,
         grade_level: item.grade_level,
         section: item.section,
+        status: "approved",
         otp_code: item.otp,
         has_voted: false,
       })));

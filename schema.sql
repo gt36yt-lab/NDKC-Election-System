@@ -23,9 +23,11 @@ create table if not exists public.students (
   has_voted boolean not null default false,
   has_agreed_terms boolean not null default false,
   otp_code text,
+  status text not null default 'pending',
   created_at timestamptz not null default now(),
   constraint students_student_id_format check (student_id ~ '^[0-9]{8}$'),
   constraint students_lrn_format check (lrn ~ '^[0-9]{8}$'),
+  constraint students_status_check check (status in ('pending', 'approved', 'rejected')),
   constraint students_otp_format check (otp_code is null or otp_code ~ '^[0-9]{6}$')
 );
 
@@ -71,6 +73,7 @@ alter table public.students
   add column if not exists has_voted boolean not null default false,
   add column if not exists has_agreed_terms boolean not null default false,
   add column if not exists otp_code text,
+  add column if not exists status text,
   add column if not exists created_at timestamptz not null default now();
 
 alter table public.candidates
@@ -96,6 +99,31 @@ update public.students
 set student_id = coalesce(student_id, lrn),
     lrn = coalesce(lrn, student_id),
     division = case when grade_level::integer >= 11 then 'SHS' else 'JHS' end;
+
+update public.students
+set status = 'approved'
+where status is null or status not in ('pending', 'approved', 'rejected');
+
+update public.students
+set status = 'approved'
+where student_id in ('20253810', '20212146');
+
+alter table public.students alter column status set default 'pending';
+alter table public.students alter column status set not null;
+
+do $$
+begin
+  if not exists (
+    select 1 from pg_constraint
+    where conrelid = 'public.students'::regclass
+      and conname = 'students_status_check'
+  ) then
+    alter table public.students
+      add constraint students_status_check
+      check (status in ('pending', 'approved', 'rejected'));
+  end if;
+end;
+$$;
 
 update public.candidates
 set allowed_grade_levels = coalesce(
@@ -477,7 +505,7 @@ for select to authenticated using (true);
 
 revoke all on public.students, public.parties, public.candidates, public.votes from anon, authenticated;
 grant select (id, student_id, lrn, full_name, email, grade_level, section, division, role,
-  has_voted, has_agreed_terms, created_at) on public.students to authenticated;
+  has_voted, has_agreed_terms, status, created_at) on public.students to authenticated;
 grant update (has_agreed_terms) on public.students to authenticated;
 grant select on public.parties, public.candidates to authenticated;
 grant select (candidate_id, position, created_at) on public.votes to authenticated;
@@ -495,10 +523,10 @@ grant execute on function public.reset_student_vote(text) to service_role;
 
 -- Optional admin account examples (create accounts through Supabase Auth first):
 -- insert into public.students
---   (id, student_id, lrn, full_name, email, grade_level, section, division, role)
+--   (id, student_id, lrn, full_name, email, grade_level, section, division, role, status)
 -- values
 --   ('<AUTH_USER_UUID_FOR_RHEANNE>', '20253810', '20253810', 'Rheanne Julia G. Gafate',
---    'rheanne@example.com', 12, 'A', 'SHS', 'admin'),
+--    'rheanne@example.com', 12, 'A', 'SHS', 'admin', 'approved'),
 --   ('<AUTH_USER_UUID_FOR_KLEO>', '20212146', '20212146', 'Kleo Andrei R. Sabino',
---    'kleo@example.com', 12, 'A', 'SHS', 'admin')
+--    'kleo@example.com', 12, 'A', 'SHS', 'admin', 'approved')
 -- on conflict (id) do update set role = excluded.role;

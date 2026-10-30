@@ -19,7 +19,36 @@ export async function middleware(request: NextRequest) {
     },
   });
 
-  await supabase.auth.getUser();
+  const { data: { user } } = await supabase.auth.getUser();
+  const pathname = request.nextUrl.pathname;
+  const isPublicPage = pathname === "/login" || pathname === "/register" || pathname.startsWith("/api/");
+
+  if (user && !isPublicPage) {
+    const { data: student, error } = await supabase
+      .from("students")
+      .select("status")
+      .eq("id", user.id)
+      .maybeSingle();
+
+    const approvalStatus = error || !student
+      ? "unavailable"
+      : student.status === "pending" || student.status === "rejected"
+        ? student.status
+        : student.status === "approved"
+          ? null
+          : "unavailable";
+
+    if (approvalStatus) {
+      const loginUrl = request.nextUrl.clone();
+      loginUrl.pathname = "/login";
+      loginUrl.search = "";
+      loginUrl.searchParams.set("approval", approvalStatus);
+      const redirectResponse = NextResponse.redirect(loginUrl);
+      response.cookies.getAll().forEach((cookie) => redirectResponse.cookies.set(cookie));
+      return redirectResponse;
+    }
+  }
+
   return response;
 }
 
