@@ -6,6 +6,7 @@ import { isSupabaseConfigured } from "@/lib/supabase/config";
 
 type Student = {
   full_name: string | null;
+  role: string | null;
   grade_level: string | number | null;
   section: string | null;
   has_agreed_terms: boolean;
@@ -31,7 +32,7 @@ export default async function StudentLayout({ children }: Readonly<{ children: R
 
   const { data: student, error: studentError } = await supabase
     .from("students")
-    .select("full_name, grade_level, section, has_agreed_terms, has_voted")
+    .select("full_name, role, grade_level, section, has_agreed_terms, has_voted")
     .eq("id", user.id)
     .maybeSingle();
 
@@ -45,5 +46,5 @@ export default async function StudentLayout({ children }: Readonly<{ children: R
   }
 
   const profile = student as Student;
-  return <><SiteHeader studentId={user.id} studentName={profile.full_name} hasVoted={profile.has_voted} /><TermsGate hasAgreed={profile.has_agreed_terms} studentId={user.id}>{children}</TermsGate></>;
+  return <><SiteHeader studentId={user.id} studentName={profile.full_name} hasVoted={profile.has_voted} isAdmin={profile.role === "admin"} /><TermsGate hasAgreed={profile.has_agreed_terms} studentId={user.id}>{children}</TermsGate></>;
 }

@@ -39,6 +39,7 @@ export default function StudentImport({ onImported }: { onImported: (students: A
       onImported(importedCredentials.map((item) => ({
         id: item.id,
         lrn: item.lrn,
+        role: "student",
         full_name: item.full_name,
         email: item.email,
         grade_level: item.grade_level,

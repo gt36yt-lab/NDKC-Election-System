@@ -84,7 +84,7 @@ export async function PUT(request: Request, { params }: { params: Promise<{ id: 
     email,
     grade_level: gradeLevel,
     section,
-  }).eq("id", id).select("id, lrn, full_name, email, grade_level, section, otp_code, has_voted").maybeSingle();
+  }).eq("id", id).select("id, lrn, role, full_name, email, grade_level, section, otp_code, has_voted").maybeSingle();
 
   if (updateError || !updated) {
     const { error: voteRollbackError } = studentId !== current.lrn

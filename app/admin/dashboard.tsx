@@ -8,6 +8,7 @@ import CandidateManagement from "./candidate-management";
 export type AdminStudent = {
   id: string;
   lrn: string;
+  role: string;
   full_name: string;
   email: string | null;
   grade_level: string | number;
@@ -28,7 +29,7 @@ export type AdminCandidate = {
 
 export type AdminParty = { id: string; name: string; description: string | null };
 
-export default function AdminDashboard({ initialStudents, initialCandidates, initialParties }: { initialStudents: AdminStudent[]; initialCandidates: AdminCandidate[]; initialParties: AdminParty[] }) {
+export default function AdminDashboard({ initialStudents, initialCandidates, initialParties, currentAdminId }: { initialStudents: AdminStudent[]; initialCandidates: AdminCandidate[]; initialParties: AdminParty[]; currentAdminId: string }) {
   const [students, setStudents] = useState(initialStudents);
   const [query, setQuery] = useState("");
   const [resettingId, setResettingId] = useState<string | null>(null);
@@ -88,6 +89,31 @@ export default function AdminDashboard({ initialStudents, initialCandidates, ini
       setNotice(`The ballot for ${student.full_name} was reset.`);
     } catch (error) {
       setNotice(error instanceof Error ? error.message : "Vote could not be reset.");
+    } finally {
+      setResettingId(null);
+    }
+  }
+
+  async function toggleRole(student: AdminStudent) {
+    if (resettingId || isSavingStudent || (student.id === currentAdminId && student.role === "admin")) return;
+    const role = student.role === "admin" ? "student" : "admin";
+    const action = role === "admin" ? "promote" : "demote";
+    if (!window.confirm(`Are you sure you want to ${action} ${student.full_name} ${role === "admin" ? "to Admin" : "to Student"}?`)) return;
+
+    setResettingId(student.id);
+    setNotice("");
+    try {
+      const response = await fetch("/api/admin/toggle-role", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ studentId: student.id, role }),
+      });
+      const result = await response.json() as { role?: string; error?: string };
+      if (!response.ok || !result.role) throw new Error(result.error ?? "Student role could not be updated.");
+      setStudents((current) => current.map((item) => item.id === student.id ? { ...item, role: result.role! } : item));
+      setNotice(`${student.full_name} is now ${result.role === "admin" ? "an Admin" : "a Student"}.`);
+    } catch (cause) {
+      setNotice(cause instanceof Error ? cause.message : "Student role could not be updated.");
     } finally {
       setResettingId(null);
     }
@@ -206,6 +232,7 @@ export default function AdminDashboard({ initialStudents, initialCandidates, ini
                 <th scope="col" className="px-3 py-3 font-bold">Student ID</th>
                 <th scope="col" className="px-3 py-3 font-bold">Full name</th>
                 <th scope="col" className="px-3 py-3 font-bold">Email</th>
+                <th scope="col" className="px-3 py-3 font-bold">Role</th>
                 <th scope="col" className="px-3 py-3 font-bold">Grade</th>
                 <th scope="col" className="px-3 py-3 font-bold">Section</th>
                 <th scope="col" className="px-3 py-3 font-bold">OTP code</th>
@@ -219,11 +246,13 @@ export default function AdminDashboard({ initialStudents, initialCandidates, ini
                   <td className="whitespace-nowrap px-3 py-3 font-mono text-xs">{student.lrn}</td>
                   <td className="px-3 py-3 font-medium">{student.full_name}</td>
                   <td className="px-3 py-3">{student.email || "—"}</td>
+                  <td className="px-3 py-3"><span className={student.role === "admin" ? "inline-flex border border-[#8a5a00]/25 bg-[#fff4cf] px-2 py-1 text-[10px] font-bold uppercase tracking-wide text-[#684400]" : "inline-flex border border-[#cfd8d1] bg-[#f3f6f3] px-2 py-1 text-[10px] font-bold uppercase tracking-wide text-[#56635a]"}>{student.role === "admin" ? "Admin" : "Student"}</span></td>
                   <td className="px-3 py-3 tabular-nums">{student.grade_level}</td>
                   <td className="px-3 py-3">{student.section || "General"}</td>
                   <td className="px-3 py-3 font-mono tabular-nums">{student.otp_code ?? "—"}</td>
                   <td className="px-3 py-3"><span className={student.has_voted ? "font-semibold text-[#005a36]" : "text-[#66736b]"}>{student.has_voted ? "Voted" : "Pending"}</span></td>
                   <td className="px-3 py-3 text-right"><div className="flex justify-end gap-2">
+                    <button type="button" disabled={resettingId !== null || isSavingStudent || (student.id === currentAdminId && student.role === "admin")} onClick={() => void toggleRole(student)} title={student.id === currentAdminId && student.role === "admin" ? "You cannot demote your own account" : undefined} aria-label={`${student.role === "admin" ? "Demote" : "Promote"} ${student.full_name} ${student.role === "admin" ? "to student" : "to admin"}`} className="inline-flex h-9 items-center justify-center border border-[#8a5a00]/40 px-3 text-xs font-semibold text-[#684400] transition hover:bg-[#fff4cf] disabled:cursor-not-allowed disabled:opacity-50">{resettingId === student.id ? "Updating…" : student.role === "admin" ? "Demote to Student" : "Promote to Admin"}</button>
                     <button type="button" disabled={resettingId !== null || isSavingStudent} onClick={() => { setEditError(""); setEditingStudent(student); }} aria-label={`Edit ${student.full_name}`} className="inline-flex h-9 items-center justify-center border border-[#cfd8d1] px-3 text-xs font-semibold transition hover:border-[#005a36] hover:text-[#005a36] disabled:cursor-not-allowed disabled:opacity-50">Edit</button>
                     <button type="button" disabled={resettingId !== null || isSavingStudent} onClick={() => void deleteStudent(student)} aria-label={`Delete ${student.full_name}`} className="inline-flex h-9 items-center justify-center border border-[#b84a3a] px-3 text-xs font-semibold text-[#8c3328] transition hover:bg-[#fbf0ee] disabled:cursor-wait disabled:opacity-50">{resettingId === student.id ? "Deleting…" : "Delete"}</button>
                     {student.has_voted ? <button type="button" disabled={resettingId !== null || isSavingStudent} onClick={() => void resetVote(student)} aria-label={`Reset vote for ${student.full_name}`} className="inline-flex h-9 items-center justify-center border border-[#b84a3a] px-3 text-xs font-semibold text-[#8c3328] transition hover:bg-[#fbf0ee] disabled:cursor-wait disabled:opacity-50">{resettingId === student.id ? "Resetting…" : "Reset vote"}</button> : <button type="button" disabled={resettingId !== null || isSavingStudent} onClick={() => void resetOtp(student)} title="Generate a new OTP" aria-label={`Generate new OTP for ${student.full_name}`} className="inline-flex h-9 items-center justify-center gap-2 border border-[#cfd8d1] px-3 text-xs font-semibold transition hover:border-[#005a36] hover:text-[#005a36] disabled:cursor-not-allowed disabled:opacity-50">
@@ -233,7 +262,7 @@ export default function AdminDashboard({ initialStudents, initialCandidates, ini
                   </div></td>
                 </tr>
               ))}
-              {filteredStudents.length === 0 && <tr><td colSpan={8} className="px-3 py-10 text-center text-sm text-[#66736b]">No matching students.</td></tr>}
+              {filteredStudents.length === 0 && <tr><td colSpan={9} className="px-3 py-10 text-center text-sm text-[#66736b]">No matching students.</td></tr>}
             </tbody>
           </table>
         </div>
