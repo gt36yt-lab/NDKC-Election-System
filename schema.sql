@@ -538,6 +538,63 @@ begin
 end;
 $$;
 
+create or replace function public.reset_election_system(p_full_reset boolean)
+returns void
+language plpgsql
+security definer
+set search_path = ''
+as $$
+begin
+  if coalesce(auth.role(), '') <> 'service_role' then
+    raise exception 'Not authorized to reset the election system';
+  end if;
+
+  delete from public.votes;
+  if p_full_reset then
+    delete from public.candidates;
+    delete from public.parties;
+  end if;
+
+  update public.students
+  set has_voted = false,
+      otp_code = lpad((
+        100000 + (
+          ('x' || encode(extensions.gen_random_bytes(6), 'hex'))::bit(48)::bigint % 900000
+        )
+      )::text, 6, '0');
+
+  update public.election_settings
+  set status = 'scheduled',
+      start_time = null,
+      end_time = null,
+      updated_by = null,
+      updated_at = now()
+  where id = 1;
+end;
+$$;
+
+create or replace function public.reset_votes_and_otps()
+returns void
+language plpgsql
+security definer
+set search_path = ''
+as $$
+begin
+  perform public.reset_election_system(false);
+end;
+$$;
+
+create or replace function public.reset_election_system_full()
+returns void
+language plpgsql
+security definer
+set search_path = ''
+as $$
+begin
+  perform public.reset_election_system(true);
+end;
+$$;
+
 alter table public.students enable row level security;
 alter table public.election_settings enable row level security;
 alter table public.parties enable row level security;
@@ -587,6 +644,12 @@ revoke all on function public.get_my_election_otp() from public, anon;
 grant execute on function public.get_my_election_otp() to authenticated;
 revoke all on function public.reset_student_vote(text) from public, anon, authenticated;
 grant execute on function public.reset_student_vote(text) to service_role;
+revoke all on function public.reset_election_system(boolean) from public, anon, authenticated;
+grant execute on function public.reset_election_system(boolean) to service_role;
+revoke all on function public.reset_votes_and_otps() from public, anon, authenticated;
+grant execute on function public.reset_votes_and_otps() to service_role;
+revoke all on function public.reset_election_system_full() from public, anon, authenticated;
+grant execute on function public.reset_election_system_full() to service_role;
 
 -- Admin authorization is enforced by the application's server-side allowlist.
 -- Do not treat user-editable auth.users user_metadata as an authorization source.

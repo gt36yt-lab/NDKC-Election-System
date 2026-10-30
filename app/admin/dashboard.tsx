@@ -1,8 +1,9 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { RefreshCw, Search } from "lucide-react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import StudentImport from "./student-import";
 import CandidateManagement from "./candidate-management";
 
@@ -46,6 +47,7 @@ function fromDateTimeInput(value: FormDataEntryValue | null) {
 }
 
 export default function AdminDashboard({ initialStudents, initialCandidates, initialParties, initialElectionSettings, currentAdminId }: { initialStudents: AdminStudent[]; initialCandidates: AdminCandidate[]; initialParties: AdminParty[]; initialElectionSettings: AdminElectionSettings; currentAdminId: string }) {
+  const router = useRouter();
   const [students, setStudents] = useState(initialStudents);
   const [query, setQuery] = useState("");
   const [resettingId, setResettingId] = useState<string | null>(null);
@@ -59,7 +61,14 @@ export default function AdminDashboard({ initialStudents, initialCandidates, ini
   const [votingStatusFilter, setVotingStatusFilter] = useState("all");
   const [electionSettings, setElectionSettings] = useState(initialElectionSettings);
   const [isSavingElectionSettings, setIsSavingElectionSettings] = useState(false);
+  const [isResettingElection, setIsResettingElection] = useState(false);
+  const [resetType, setResetType] = useState<"soft" | "hard" | null>(null);
   const [electionMessage, setElectionMessage] = useState<{ text: string; error: boolean } | null>(null);
+  useEffect(() => {
+    setStudents(initialStudents);
+    setElectionSettings(initialElectionSettings);
+  }, [initialElectionSettings, initialStudents]);
+
   const totalVoters = students.length;
   const votedCount = students.filter((student) => student.has_voted).length;
   const turnout = totalVoters === 0 ? 0 : Math.round((votedCount / totalVoters) * 100);
@@ -232,6 +241,31 @@ export default function AdminDashboard({ initialStudents, initialCandidates, ini
       setElectionMessage({ text: cause instanceof Error ? cause.message : "Election status could not be updated.", error: true });
     } finally {
       setIsSavingElectionSettings(false);
+    }
+  }
+
+  async function resetElection() {
+    if (!resetType || isResettingElection) return;
+    setIsResettingElection(true);
+    setElectionMessage(null);
+    try {
+      const response = await fetch("/api/admin/reset", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ type: resetType }),
+      });
+      const result = await response.json() as { success?: boolean; error?: string };
+      if (!response.ok || !result.success) throw new Error(result.error ?? "The election system could not be reset.");
+
+      const resetLabel = resetType === "soft" ? "Votes and OTPs were reset. Candidates and parties were kept." : "The full election system was reset, including candidates and parties.";
+      setElectionMessage({ text: resetLabel, error: false });
+      setElectionSettings({ status: "scheduled", start_time: null, end_time: null });
+      setResetType(null);
+      router.refresh();
+    } catch (cause) {
+      setElectionMessage({ text: cause instanceof Error ? cause.message : "The election system could not be reset.", error: true });
+    } finally {
+      setIsResettingElection(false);
     }
   }
 
@@ -451,8 +485,30 @@ export default function AdminDashboard({ initialStudents, initialCandidates, ini
           <label className="text-sm font-semibold">Voting ends<input name="end_time" type="datetime-local" defaultValue={toDateTimeInput(electionSettings.end_time)} className="mt-2 h-11 w-full border border-[#cfd8d1] bg-white px-3 text-sm" /></label>
           <button type="submit" disabled={isSavingElectionSettings} className="h-11 justify-self-start bg-[#005a36] px-5 text-sm font-bold text-white hover:bg-[#003d28] disabled:opacity-50 sm:col-span-2">{isSavingElectionSettings ? "Saving…" : "Save schedule"}</button>
         </form>
-        <div className="mt-5 flex flex-wrap gap-3"><button type="button" disabled={isSavingElectionSettings || electionSettings.status === "scheduled"} onClick={() => void setElectionStatus("scheduled")} className="h-11 border border-[#cfd8d1] px-4 text-sm font-semibold hover:border-[#005a36] disabled:opacity-50">Schedule election</button><button type="button" disabled={isSavingElectionSettings || electionSettings.status === "active"} onClick={() => void setElectionStatus("active")} className="h-11 bg-[#005a36] px-4 text-sm font-bold text-white hover:bg-[#003d28] disabled:opacity-50">Start voting</button><button type="button" disabled={isSavingElectionSettings || electionSettings.status !== "active"} onClick={() => void setElectionStatus("ended")} className="h-11 border border-[#cfd8d1] px-4 text-sm font-semibold hover:border-[#005a36] disabled:opacity-50">End voting</button><button type="button" disabled={isSavingElectionSettings || electionSettings.status === "cancelled"} onClick={() => void setElectionStatus("cancelled")} className="h-11 border border-[#b84a3a] px-4 text-sm font-semibold text-[#8c3328] hover:bg-[#fbf0ee] disabled:opacity-50">Emergency cancel</button></div>
+        <div className="mt-5 flex flex-wrap gap-3"><button type="button" disabled={isSavingElectionSettings || isResettingElection || electionSettings.status === "scheduled"} onClick={() => void setElectionStatus("scheduled")} className="h-11 border border-[#cfd8d1] px-4 text-sm font-semibold hover:border-[#005a36] disabled:opacity-50">Schedule election</button><button type="button" disabled={isSavingElectionSettings || isResettingElection || electionSettings.status === "active"} onClick={() => void setElectionStatus("active")} className="h-11 bg-[#005a36] px-4 text-sm font-bold text-white hover:bg-[#003d28] disabled:opacity-50">Start voting</button><button type="button" disabled={isSavingElectionSettings || isResettingElection || electionSettings.status !== "active"} onClick={() => void setElectionStatus("ended")} className="h-11 border border-[#cfd8d1] px-4 text-sm font-semibold hover:border-[#005a36] disabled:opacity-50">End voting</button><button type="button" disabled={isSavingElectionSettings || isResettingElection || electionSettings.status === "cancelled"} onClick={() => void setElectionStatus("cancelled")} className="h-11 border border-[#b84a3a] px-4 text-sm font-semibold text-[#8c3328] hover:bg-[#fbf0ee] disabled:opacity-50">Emergency cancel</button></div>
+        <div className="mt-8 border-t border-[#cfd8d1] pt-5">
+          <h3 className="text-sm font-bold uppercase tracking-wide text-[#4e5b53]">Reset election data</h3>
+          <p className="mt-1 text-sm leading-6 text-[#66736b]">Both reset options clear ballots, reset voter status, generate new OTPs, and return the election to scheduled.</p>
+          <div className="mt-4 flex flex-wrap gap-3">
+            <button type="button" disabled={isSavingElectionSettings || isResettingElection} onClick={() => { setElectionMessage(null); setResetType("soft"); }} className="h-11 border border-[#b88a16] bg-[#fff4cf] px-4 text-sm font-bold text-[#684400] transition hover:bg-[#fce8a6] disabled:cursor-not-allowed disabled:opacity-50">Reset Votes &amp; OTPs Only</button>
+            <button type="button" disabled={isSavingElectionSettings || isResettingElection} onClick={() => { setElectionMessage(null); setResetType("hard"); }} className="h-11 border border-[#b84a3a] bg-[#b84a3a] px-4 text-sm font-bold text-white transition hover:bg-[#8c3328] disabled:cursor-not-allowed disabled:opacity-50">Full System Reboot</button>
+          </div>
+        </div>
       </section> : <CandidateManagement initialCandidates={initialCandidates} initialParties={initialParties} />}
+      {resetType && <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4" onClick={() => { if (!isResettingElection) setResetType(null); }}>
+        <section role="dialog" aria-modal="true" aria-labelledby="system-reset-title" className="w-full max-w-lg border border-[#d9e0db] bg-white p-6 shadow-2xl sm:p-8" onClick={(event) => event.stopPropagation()}>
+          <p className={`text-xs font-bold uppercase tracking-[0.18em] ${resetType === "soft" ? "text-[#8a5a00]" : "text-[#8c3328]"}`}>Confirm election reset</p>
+          <h2 id="system-reset-title" className="display-font mt-3 text-2xl">{resetType === "soft" ? "Reset votes and OTPs?" : "Reboot the full election system?"}</h2>
+          <p className="mt-4 text-sm leading-6 text-[#4e5b53]">{resetType === "soft"
+            ? "This permanently deletes every recorded vote, resets all students to not voted, generates new OTPs, and clears the election schedule. Candidates, parties, and manifestos will be kept."
+            : "This permanently deletes every recorded vote, all candidates, all parties, and their manifestos. Student accounts remain; their voting status is reset, new OTPs are generated, and the election schedule is cleared."}</p>
+          {electionMessage?.error && <p role="alert" className="mt-4 border-l-2 border-[#b84a3a] bg-[#fbf0ee] px-4 py-3 text-sm text-[#8c3328]">{electionMessage.text}</p>}
+          <div className="mt-6 flex justify-end gap-3">
+            <button type="button" disabled={isResettingElection} onClick={() => setResetType(null)} className="h-10 border border-[#cfd8d1] px-4 text-sm font-semibold hover:border-[#005a36] disabled:opacity-50">Cancel</button>
+            <button type="button" disabled={isResettingElection} onClick={() => void resetElection()} className={`h-10 px-4 text-sm font-bold text-white disabled:cursor-wait disabled:opacity-50 ${resetType === "soft" ? "bg-[#a97700] hover:bg-[#805900]" : "bg-[#b84a3a] hover:bg-[#8c3328]"}`}>{isResettingElection ? "Resetting…" : resetType === "soft" ? "Reset votes & OTPs" : "Reboot system"}</button>
+          </div>
+        </section>
+      </div>}
     </main>
   );
 }

@@ -1,3 +1,4 @@
+import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { candidateDivision } from "@/lib/position-order";
 import LiveResults, { type ResultCandidate, type VoteRow } from "./live-results";
@@ -8,6 +9,23 @@ export default async function ResultsPage() {
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return null;
+
+  const [{ data: student, error: studentError }, { data: electionSettings, error: settingsError }] = await Promise.all([
+    supabase.from("students").select("role, has_voted").eq("id", user.id).maybeSingle(),
+    supabase.from("election_settings").select("status").eq("id", 1).maybeSingle(),
+  ]);
+  if (studentError || settingsError || !student || !electionSettings) {
+    console.error("[ResultsPage] Access check failed:", studentError ?? settingsError ?? "Student profile or election settings not found.");
+    return (
+      <main className="mx-auto max-w-3xl px-5 py-16 sm:px-8">
+        <h1 className="display-font text-3xl">Results are unavailable</h1>
+        <p role="alert" className="mt-3 text-sm leading-6 text-[#66736b]">Your voting eligibility could not be verified. Please try again later.</p>
+      </main>
+    );
+  }
+  if (student.role !== "admin" && (!student.has_voted || !["active", "ended"].includes(electionSettings.status))) {
+    redirect("/vote");
+  }
 
   const [{ data: candidates, error: candidateError }, { data: votes, error: voteError }, { data: parties, error: partyError }] = await Promise.all([
     supabase.from("candidates").select("id, full_name, position, division, allowed_grade_levels, party_id, image_url").order("position").order("full_name"),
