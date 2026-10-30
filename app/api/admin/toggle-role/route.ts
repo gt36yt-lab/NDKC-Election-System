@@ -2,8 +2,6 @@ import { NextResponse } from "next/server";
 import { getAdminAccess, isAdminServiceConfigured } from "@/lib/supabase/admin-access";
 import { createAdminClient } from "@/lib/supabase/admin";
 
-type Role = "admin" | "student";
-
 export async function POST(request: Request) {
   const access = await getAdminAccess();
   if (access.status !== "authorized") {

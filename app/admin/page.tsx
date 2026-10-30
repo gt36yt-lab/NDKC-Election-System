@@ -15,11 +15,11 @@ function AdminNotice({ title, message }: { title: string; message: string }) {
 
 export default async function AdminPage() {
   const access = await getAdminAccess();
-  if (access.status === "unauthenticated") redirect("/login?next=/admin");
-  if (access.status === "not-configured") {
-    return <AdminNotice title="Admin access is not configured" message="Configure the Electoral Board Student ID allowlist in the server environment, then restart the app." />;
-  }
-  if (access.status === "forbidden") {
+  if (access.status !== "authorized") {
+    if (access.status === "unauthenticated") redirect("/login?next=/admin");
+    if (access.status === "not-configured") {
+      return <AdminNotice title="Admin access is not configured" message="Configure Supabase environment variables, then restart the app." />;
+    }
     return <AdminNotice title="Access denied" message="This account is not authorized to use the Electoral Board dashboard." />;
   }
   if (!isAdminServiceConfigured()) {
