@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { revalidatePath } from "next/cache";
 import { getAdminAccess, isAdminServiceConfigured } from "@/lib/supabase/admin-access";
 import { createAdminClient } from "@/lib/supabase/admin";
 
@@ -39,7 +40,10 @@ export async function PATCH(request: Request) {
     .select("status, start_time, end_time")
     .eq("id", 1)
     .maybeSingle();
-  if (currentError) return NextResponse.json({ error: "Election settings could not be loaded." }, { status: 500 });
+  if (currentError) {
+    console.error("[ElectionSettings] Current settings lookup failed:", currentError);
+    return NextResponse.json({ error: "Election settings could not be loaded. Run the current schema.sql in Supabase." }, { status: 500 });
+  }
 
   const nextStart = startTime === undefined ? current?.start_time ?? null : startTime;
   const nextEnd = endTime === undefined ? current?.end_time ?? null : endTime;
@@ -59,7 +63,15 @@ export async function PATCH(request: Request) {
     }, { onConflict: "id" })
     .select("id, status, start_time, end_time, updated_at")
     .single();
-  if (error) return NextResponse.json({ error: "Election settings could not be saved." }, { status: 500 });
+  if (error) {
+    console.error("[ElectionSettings] Settings upsert failed:", error);
+    return NextResponse.json({ error: "Election settings could not be saved. Check the election_settings table and service-role permissions." }, { status: 500 });
+  }
+
+  revalidatePath("/");
+  revalidatePath("/admin");
+  revalidatePath("/candidates");
+  revalidatePath("/vote");
 
   return NextResponse.json({ settings: data });
 }

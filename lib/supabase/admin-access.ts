@@ -23,7 +23,7 @@ export async function getAdminAccess(): Promise<AdminAccess> {
 
   const { data: student, error: studentError } = await supabase
     .from("students")
-    .select("student_id, lrn, role")
+    .select("student_id, lrn, role, status")
     .eq("id", user.id)
     .maybeSingle();
 
@@ -32,6 +32,7 @@ export async function getAdminAccess(): Promise<AdminAccess> {
     return { status: "forbidden" };
   }
   if (!student) return { status: "forbidden" };
+  if (student.status !== "approved") return { status: "forbidden" };
 
   const studentId = typeof student.student_id === "string" ? student.student_id : "";
   const lrn = typeof student.lrn === "string" ? student.lrn : studentId;

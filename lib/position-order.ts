@@ -16,13 +16,13 @@ export const POSITION_ORDER = [
   "Representative",
 ];
 
-export const POSITION_OPTIONS = POSITION_ORDER.flatMap((position) => {
-  const label = position === "Vice-president" ? "Vice President" : position;
-  return [
-    { value: `${label} (JHS)`, division: "JHS", grades: [7, 8, 9, 10] },
-    { value: `${label} (SHS)`, division: "SHS", grades: [11, 12] },
-  ];
-});
+export const POSITION_OPTIONS = (["SHS", "JHS"] as const).flatMap((division) =>
+  POSITION_ORDER.map((position) => {
+    const label = position === "Vice-president" ? "Vice President" : position;
+    const grades = division === "SHS" ? [11, 12] : [7, 8, 9, 10];
+    return { value: `${label} (${division})`, division, grades };
+  }),
+);
 
 export type CandidateEligibility = {
   position: string;
