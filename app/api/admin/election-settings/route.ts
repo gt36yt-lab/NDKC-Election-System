@@ -28,9 +28,13 @@ export async function PATCH(request: Request) {
     if (typeof value !== "string" || !Number.isFinite(Date.parse(value))) return undefined;
     return new Date(value).toISOString();
   };
-  const startTime = body.start_time === undefined ? undefined : parseTime(body.start_time);
-  const endTime = body.end_time === undefined ? undefined : parseTime(body.end_time);
-  if (startTime === undefined || endTime === undefined) {
+  const startWasProvided = body.start_time !== undefined;
+  const endWasProvided = body.end_time !== undefined;
+  const startTime = startWasProvided ? parseTime(body.start_time) : undefined;
+  const endTime = endWasProvided ? parseTime(body.end_time) : undefined;
+  const manualStart = body.status === "active" && (!startWasProvided || startTime === null || startTime === undefined);
+  if ((!manualStart && startWasProvided && startTime === undefined)
+    || (body.status !== "active" && endWasProvided && endTime === undefined)) {
     return NextResponse.json({ error: "Enter valid start and end dates." }, { status: 400 });
   }
 
@@ -45,8 +49,11 @@ export async function PATCH(request: Request) {
     return NextResponse.json({ error: "Election settings could not be loaded. Run the current schema.sql in Supabase." }, { status: 500 });
   }
 
-  const nextStart = startTime === undefined ? current?.start_time ?? null : startTime;
-  const nextEnd = endTime === undefined ? current?.end_time ?? null : endTime;
+  const nextStart = manualStart
+    ? new Date().toISOString()
+    : startWasProvided ? startTime ?? null : current?.start_time ?? null;
+  let nextEnd = endWasProvided && endTime !== undefined ? endTime : current?.end_time ?? null;
+  if (body.status === "active" && nextEnd && Date.parse(nextEnd) <= Date.parse(nextStart ?? "")) nextEnd = null;
   if (nextStart && nextEnd && Date.parse(nextEnd) <= Date.parse(nextStart)) {
     return NextResponse.json({ error: "Voting end time must be after the start time." }, { status: 400 });
   }
@@ -72,6 +79,10 @@ export async function PATCH(request: Request) {
   revalidatePath("/admin");
   revalidatePath("/candidates");
   revalidatePath("/vote");
+  revalidatePath("/ballot");
 
   return NextResponse.json({ settings: data });
 }
+
+export const POST = PATCH;
+export const PUT = PATCH;

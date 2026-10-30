@@ -59,6 +59,7 @@ export default function AdminDashboard({ initialStudents, initialCandidates, ini
   const [votingStatusFilter, setVotingStatusFilter] = useState("all");
   const [electionSettings, setElectionSettings] = useState(initialElectionSettings);
   const [isSavingElectionSettings, setIsSavingElectionSettings] = useState(false);
+  const [electionMessage, setElectionMessage] = useState<{ text: string; error: boolean } | null>(null);
   const totalVoters = students.length;
   const votedCount = students.filter((student) => student.has_voted).length;
   const turnout = totalVoters === 0 ? 0 : Math.round((votedCount / totalVoters) * 100);
@@ -190,7 +191,7 @@ export default function AdminDashboard({ initialStudents, initialCandidates, ini
     if (isSavingElectionSettings) return;
     const form = new FormData(event.currentTarget);
     setIsSavingElectionSettings(true);
-    setNotice("");
+    setElectionMessage(null);
     try {
       const response = await fetch("/api/admin/election-settings", {
         method: "PATCH",
@@ -204,9 +205,9 @@ export default function AdminDashboard({ initialStudents, initialCandidates, ini
       const result = await response.json() as { settings?: AdminElectionSettings; error?: string };
       if (!response.ok || !result.settings) throw new Error(result.error ?? "Election schedule could not be saved.");
       setElectionSettings(result.settings);
-      setNotice("Election schedule saved.");
+      setElectionMessage({ text: "Election schedule saved.", error: false });
     } catch (cause) {
-      setNotice(cause instanceof Error ? cause.message : "Election schedule could not be saved.");
+      setElectionMessage({ text: cause instanceof Error ? cause.message : "Election schedule could not be saved.", error: true });
     } finally {
       setIsSavingElectionSettings(false);
     }
@@ -216,7 +217,7 @@ export default function AdminDashboard({ initialStudents, initialCandidates, ini
     if (isSavingElectionSettings) return;
     if (status === "cancelled" && !window.confirm("Cancel this election immediately? Voting will stop.")) return;
     setIsSavingElectionSettings(true);
-    setNotice("");
+    setElectionMessage(null);
     try {
       const response = await fetch("/api/admin/election-settings", {
         method: "PATCH",
@@ -226,9 +227,9 @@ export default function AdminDashboard({ initialStudents, initialCandidates, ini
       const result = await response.json() as { settings?: AdminElectionSettings; error?: string };
       if (!response.ok || !result.settings) throw new Error(result.error ?? "Election status could not be updated.");
       setElectionSettings(result.settings);
-      setNotice(`Election status set to ${status}.`);
+      setElectionMessage({ text: `Election status set to ${status}.`, error: false });
     } catch (cause) {
-      setNotice(cause instanceof Error ? cause.message : "Election status could not be updated.");
+      setElectionMessage({ text: cause instanceof Error ? cause.message : "Election status could not be updated.", error: true });
     } finally {
       setIsSavingElectionSettings(false);
     }
@@ -444,7 +445,7 @@ export default function AdminDashboard({ initialStudents, initialCandidates, ini
         </div>
       </section> : activeTab === "election" ? <section className="mt-8 max-w-3xl" aria-labelledby="election-control-title">
         <div className="flex flex-wrap items-center justify-between gap-4 border-b border-[#cfd8d1] pb-4"><div><h2 id="election-control-title" className="display-font text-2xl">Election control panel</h2><p className="mt-1 text-sm text-[#66736b]">Current state: <span className="font-bold uppercase text-[#005a36]">{electionSettings.status}</span></p></div><Link href="/admin/results" className="text-sm font-semibold text-[#005a36] underline">View division results</Link></div>
-        {notice && <p role="status" className="mt-4 border-l-2 border-[#005a36] bg-[#e5f0e9] px-4 py-3 text-sm text-[#174b32]">{notice}</p>}
+        {electionMessage && <p role={electionMessage.error ? "alert" : "status"} className={`mt-4 border-l-2 px-4 py-3 text-sm ${electionMessage.error ? "border-[#b84a3a] bg-[#fbf0ee] text-[#8c3328]" : "border-[#005a36] bg-[#e5f0e9] text-[#174b32]"}`}>{electionMessage.text}</p>}
         <form onSubmit={(event) => void saveElectionSettings(event)} className="mt-5 grid gap-4 border-y border-[#d9e0db] bg-white/80 p-5 sm:grid-cols-2">
           <label className="text-sm font-semibold">Voting starts<input name="start_time" type="datetime-local" defaultValue={toDateTimeInput(electionSettings.start_time)} className="mt-2 h-11 w-full border border-[#cfd8d1] bg-white px-3 text-sm" /></label>
           <label className="text-sm font-semibold">Voting ends<input name="end_time" type="datetime-local" defaultValue={toDateTimeInput(electionSettings.end_time)} className="mt-2 h-11 w-full border border-[#cfd8d1] bg-white px-3 text-sm" /></label>
