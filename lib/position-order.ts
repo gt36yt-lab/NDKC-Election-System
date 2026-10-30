@@ -16,10 +16,27 @@ export const POSITION_ORDER = [
   "Representative",
 ];
 
+export const POSITION_OPTIONS = POSITION_ORDER.flatMap((position) => {
+  const label = position === "Vice-president" ? "Vice President" : position;
+  return [
+    { value: `${label} (JHS)`, division: "JHS", grades: [7, 8, 9, 10] },
+    { value: `${label} (SHS)`, division: "SHS", grades: [11, 12] },
+  ];
+});
+
 export type CandidateEligibility = {
   position: string;
   allowed_grade_levels: number[] | null;
 };
+
+export function candidateDivision(candidate: { division: string | null; position: string; allowed_grade_levels: number[] | null }): "JHS" | "SHS" | "both" {
+  if (candidate.division === "JHS" || candidate.division === "SHS") return candidate.division;
+  const positionDivision = candidate.position.match(/\b(JHS|SHS)\b/i)?.[1]?.toUpperCase();
+  if (positionDivision === "JHS" || positionDivision === "SHS") return positionDivision;
+  if (candidate.allowed_grade_levels?.every((grade) => grade <= 10)) return "JHS";
+  if (candidate.allowed_grade_levels?.every((grade) => grade >= 11)) return "SHS";
+  return "both";
+}
 
 export function positionRank(position: string) {
   const normalized = position

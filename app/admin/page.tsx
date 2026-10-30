@@ -1,5 +1,5 @@
 import { redirect } from "next/navigation";
-import AdminDashboard, { type AdminCandidate, type AdminParty, type AdminStudent } from "./dashboard";
+import AdminDashboard, { type AdminCandidate, type AdminElectionSettings, type AdminParty, type AdminStudent } from "./dashboard";
 import { getAdminAccess, isAdminServiceConfigured } from "@/lib/supabase/admin-access";
 import { createAdminClient } from "@/lib/supabase/admin";
 
@@ -27,15 +27,19 @@ export default async function AdminPage() {
   }
 
   const admin = createAdminClient();
-  const [{ data: students, error }, { data: candidates }, { data: parties }] = await Promise.all([
+  const [{ data: students, error }, { data: candidates }, { data: parties }, { data: electionSettings, error: settingsError }] = await Promise.all([
     admin.from("students").select("id, lrn, role, status, full_name, email, grade_level, section, otp_code, has_voted").order("grade_level").order("section").order("full_name"),
-    admin.from("candidates").select("id, full_name, position, party_id, platform, image_url, allowed_grade_levels").order("position").order("full_name"),
+    admin.from("candidates").select("id, full_name, position, division, party_id, platform, manifesto, image_url, photo_url, allowed_grade_levels").order("position").order("full_name"),
     admin.from("parties").select("id, name, description").order("name"),
+    admin.from("election_settings").select("status, start_time, end_time").eq("id", 1).maybeSingle(),
   ]);
 
   if (error) {
     return <AdminNotice title="Student records could not be loaded" message="Check the Supabase service role configuration and students table schema, then reload this page." />;
   }
+  if (settingsError) {
+    return <AdminNotice title="Election settings could not be loaded" message="Run the current schema.sql in Supabase, then reload this page." />;
+  }
 
-  return <AdminDashboard initialStudents={(students ?? []) as AdminStudent[]} initialCandidates={(candidates ?? []) as AdminCandidate[]} initialParties={(parties ?? []) as AdminParty[]} currentAdminId={access.userId} />;
+  return <AdminDashboard initialStudents={(students ?? []) as AdminStudent[]} initialCandidates={(candidates ?? []) as AdminCandidate[]} initialParties={(parties ?? []) as AdminParty[]} initialElectionSettings={(electionSettings ?? { status: "scheduled", start_time: null, end_time: null }) as AdminElectionSettings} currentAdminId={access.userId} />;
 }

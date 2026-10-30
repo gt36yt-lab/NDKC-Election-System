@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { getAdminAccess, isAdminServiceConfigured } from "@/lib/supabase/admin-access";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { POSITION_OPTIONS } from "@/lib/position-order";
 
 export async function POST(request: Request) {
   const access = await getAdminAccess();
@@ -16,16 +17,17 @@ export async function POST(request: Request) {
   const platform = typeof body?.platform === "string" ? body.platform.trim() : "";
   const image_url = typeof body?.image_url === "string" ? body.image_url.trim() : "";
   const allowed_grade_levels = body?.allowed_grade_levels;
+  const positionOption = POSITION_OPTIONS.find((option) => option.value === position);
 
-  if (!full_name || !position) return NextResponse.json({ error: "Full name and position are required." }, { status: 400 });
-  if (!Array.isArray(allowed_grade_levels) || allowed_grade_levels.length === 0 || !allowed_grade_levels.every((grade) => Number.isInteger(grade) && grade >= 7 && grade <= 12)) {
-    return NextResponse.json({ error: "Choose one or more valid grade levels from 7 to 12." }, { status: 400 });
+  if (!full_name || !positionOption) return NextResponse.json({ error: "Full name and a valid division position are required." }, { status: 400 });
+  if (!Array.isArray(allowed_grade_levels) || allowed_grade_levels.length === 0 || !allowed_grade_levels.every((grade) => Number.isInteger(grade) && positionOption.grades.includes(grade))) {
+    return NextResponse.json({ error: `Choose eligible grades within ${positionOption.division}.` }, { status: 400 });
   }
 
   const { data, error } = await createAdminClient()
     .from("candidates")
-    .insert({ full_name, position, party_id, platform: platform || null, image_url: image_url || null, allowed_grade_levels })
-    .select("id, full_name, position, party_id, platform, image_url, allowed_grade_levels")
+    .insert({ full_name, position, division: positionOption.division, party_id, manifesto: platform || null, platform: platform || null, image_url: image_url || null, allowed_grade_levels })
+    .select("id, full_name, position, division, party_id, platform, manifesto, image_url, photo_url, allowed_grade_levels")
     .single();
   if (error) return NextResponse.json({ error: "Candidate could not be created. Verify the party and candidate table policies." }, { status: 500 });
   return NextResponse.json({ candidate: data }, { status: 201 });

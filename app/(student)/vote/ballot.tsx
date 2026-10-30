@@ -1,7 +1,9 @@
 "use client";
 
+import Image from "next/image";
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
+import { X } from "lucide-react";
 import { isMultipleSelectionPosition, sortPositions } from "@/lib/position-order";
 import { submitBallot } from "./actions";
 
@@ -11,6 +13,8 @@ type Candidate = {
   position: string;
   party_id: string | null;
   platform: string | null;
+  manifesto: string | null;
+  image_url: string | null;
   allowed_grade_levels: number[] | null;
 };
 
@@ -33,6 +37,7 @@ export default function Ballot({
   const [otp, setOtp] = useState("");
   const [isReviewOpen, setIsReviewOpen] = useState(false);
   const [isOtpOpen, setIsOtpOpen] = useState(false);
+  const [manifestoCandidate, setManifestoCandidate] = useState<Candidate | null>(null);
   const [error, setError] = useState("");
   const [isPending, startTransition] = useTransition();
   const groups = new Map<string, Candidate[]>();
@@ -74,11 +79,12 @@ export default function Ballot({
               {isMultipleSelectionPosition(position) && <p className="mt-2 text-xs text-[#66736b]">Choose up to two candidates.</p>}
               <div className="divide-y divide-[#e5eae6]">
                 {positionCandidates.map((candidate) => (
-                  <label key={candidate.id} className="flex cursor-pointer items-start gap-4 py-5">
+                  <div key={candidate.id} className="flex items-start gap-4 py-5">
                     <input
                       type={isMultipleSelectionPosition(position) ? "checkbox" : "radio"}
                       name={`position-${position}`}
                       value={candidate.id}
+                      aria-label={`Select ${candidate.full_name} for ${position}`}
                       checked={selected[position]?.includes(candidate.id) ?? false}
                       disabled={isMultipleSelectionPosition(position) && (selected[position]?.length ?? 0) >= 2 && !selected[position]?.includes(candidate.id)}
                       onChange={() => setSelected((current) => {
@@ -92,12 +98,13 @@ export default function Ballot({
                       })}
                       className="mt-1 size-4 shrink-0 accent-[#005a36]"
                     />
-                    <span className="min-w-0">
-                      <span className="block font-semibold">{candidate.full_name}</span>
-                      <span className="mt-1 block text-xs font-bold uppercase tracking-wide text-[#005a36]">{candidate.party_id ? partyNames[candidate.party_id] ?? "Party affiliation unavailable" : "Independent"}</span>
-                      {candidate.platform && <span className="mt-2 block whitespace-pre-line text-sm leading-6 text-[#66736b]">{candidate.platform}</span>}
-                    </span>
-                  </label>
+                    {candidate.image_url && <Image src={candidate.image_url} alt="" width={88} height={88} unoptimized className="size-[88px] shrink-0 object-cover" />}
+                    <div className="min-w-0">
+                      <p className="font-semibold">{candidate.full_name}</p>
+                      <p className="mt-1 text-xs font-bold uppercase tracking-wide text-[#005a36]">{candidate.party_id ? partyNames[candidate.party_id] ?? "Party affiliation unavailable" : "Independent"}</p>
+                      {(candidate.manifesto || candidate.platform) && <><p className="mt-2 line-clamp-2 whitespace-pre-line text-sm leading-6 text-[#66736b]">{candidate.manifesto || candidate.platform}</p><button type="button" onClick={() => setManifestoCandidate(candidate)} className="mt-2 text-xs font-bold text-[#005a36] underline">Read full manifesto</button></>}
+                    </div>
+                  </div>
                 ))}
               </div>
             </fieldset>
@@ -159,6 +166,13 @@ export default function Ballot({
               <button type="submit" disabled={isPending} className="h-11 bg-[#005a36] px-5 text-sm font-bold text-white hover:bg-[#003d28] disabled:cursor-wait disabled:opacity-60">{isPending ? "Submitting…" : "Confirm vote"}</button>
             </div>
           </form>
+        </section>
+      </div>}
+      {manifestoCandidate && <div className="fixed inset-0 z-[60] grid place-items-center overflow-y-auto bg-[#10251b]/65 p-4 backdrop-blur-[2px]">
+        <section role="dialog" aria-modal="true" aria-labelledby="candidate-manifesto-title" className="my-auto w-full max-w-2xl border border-[#d9e0db] bg-white p-6 shadow-2xl sm:p-8">
+          <div className="flex items-start justify-between gap-4"><div><p className="text-xs font-bold uppercase tracking-wide text-[#005a36]">{manifestoCandidate.position}</p><h2 id="candidate-manifesto-title" className="display-font mt-2 text-3xl">{manifestoCandidate.full_name}</h2></div><button type="button" onClick={() => setManifestoCandidate(null)} aria-label="Close manifesto" className="grid size-9 place-items-center border border-[#d9e0db] hover:bg-[#f3f5f3]"><X aria-hidden="true" className="size-4" /></button></div>
+          {manifestoCandidate.image_url && <Image src={manifestoCandidate.image_url} alt={manifestoCandidate.full_name} width={1200} height={600} unoptimized className="mt-5 max-h-72 w-full object-cover" />}
+          <p className="mt-5 whitespace-pre-line text-sm leading-7 text-[#4e5b53]">{manifestoCandidate.manifesto || manifestoCandidate.platform}</p>
         </section>
       </div>}
     </>

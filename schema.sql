@@ -31,6 +31,20 @@ create table if not exists public.students (
   constraint students_otp_format check (otp_code is null or otp_code ~ '^[0-9]{6}$')
 );
 
+create table if not exists public.election_settings (
+  id smallint primary key default 1 check (id = 1),
+  status text not null default 'scheduled' check (status in ('scheduled', 'active', 'ended', 'cancelled')),
+  start_time timestamptz,
+  end_time timestamptz,
+  updated_at timestamptz not null default now(),
+  updated_by uuid references public.students (id) on delete set null,
+  constraint election_settings_time_order check (start_time is null or end_time is null or end_time > start_time)
+);
+
+insert into public.election_settings (id, status)
+values (1, 'scheduled')
+on conflict (id) do nothing;
+
 create table if not exists public.candidates (
   id uuid primary key default gen_random_uuid(),
   full_name text not null,
@@ -62,6 +76,13 @@ create table if not exists public.votes (
   created_at timestamptz not null default now(),
   constraint votes_one_candidate_per_position unique (voter_id, position, candidate_id)
 );
+
+insert into storage.buckets (id, name, public, file_size_limit, allowed_mime_types)
+values ('candidate-photos', 'candidate-photos', true, 4194304, array['image/jpeg', 'image/png', 'image/webp'])
+on conflict (id) do update
+set public = excluded.public,
+    file_size_limit = excluded.file_size_limit,
+    allowed_mime_types = excluded.allowed_mime_types;
 
 -- CREATE TABLE IF NOT EXISTS does not add columns to tables created by older versions.
 alter table public.students
@@ -140,6 +161,15 @@ set allowed_grade_levels = coalesce(
     image_url = coalesce(image_url, photo_url),
     manifesto = coalesce(manifesto, platform),
     platform = coalesce(platform, manifesto);
+
+update public.candidates
+set division = case
+  when position ilike '%(JHS)%' or position ilike '% JHS%' then 'JHS'
+  when position ilike '%(SHS)%' or position ilike '% SHS%' then 'SHS'
+  when allowed_grade_levels is not null and allowed_grade_levels <@ array[7, 8, 9, 10]::integer[] then 'JHS'
+  when allowed_grade_levels is not null and allowed_grade_levels <@ array[11, 12]::integer[] then 'SHS'
+  else division
+end;
 
 update public.votes as vote
 set voter_id = student.id
@@ -354,6 +384,7 @@ set search_path = ''
 as $$
 declare
   student_row public.students%rowtype;
+  election_status text;
 begin
   if auth.uid() is null or auth.uid() <> p_student_id then
     raise exception 'Not authorized to submit this ballot';
@@ -372,6 +403,15 @@ begin
 
   if not found or student_row.lrn <> p_student_lrn then
     raise exception 'Student profile could not be verified';
+  end if;
+  if student_row.status <> 'approved' then
+    raise exception 'This student account is not approved';
+  end if;
+  select setting.status into election_status
+  from public.election_settings as setting
+  where setting.id = 1;
+  if election_status is distinct from 'active' then
+    raise exception 'Voting is not currently active';
   end if;
   if not student_row.has_agreed_terms then
     raise exception 'Election terms must be accepted before voting';
@@ -443,6 +483,27 @@ begin
 end;
 $$;
 
+drop function if exists public.get_my_election_otp();
+
+create function public.get_my_election_otp()
+returns table (status text, otp_code text)
+language sql
+stable
+security definer
+set search_path = ''
+as $$
+  select setting.status,
+    case
+      when setting.status = 'active'
+        and student.status = 'approved'
+        and not student.has_voted then student.otp_code
+      else null
+    end as otp_code
+  from public.election_settings as setting
+  join public.students as student on student.id = auth.uid()
+  where setting.id = 1
+$$;
+
 drop function if exists public.get_my_votes();
 
 create function public.get_my_votes()
@@ -478,6 +539,7 @@ end;
 $$;
 
 alter table public.students enable row level security;
+alter table public.election_settings enable row level security;
 alter table public.parties enable row level security;
 alter table public.candidates enable row level security;
 alter table public.votes enable row level security;
@@ -495,6 +557,10 @@ drop policy if exists parties_read_authenticated on public.parties;
 create policy parties_read_authenticated on public.parties
 for select to authenticated using (true);
 
+drop policy if exists election_settings_read_authenticated on public.election_settings;
+create policy election_settings_read_authenticated on public.election_settings
+for select to authenticated using (true);
+
 drop policy if exists candidates_read_authenticated on public.candidates;
 create policy candidates_read_authenticated on public.candidates
 for select to authenticated using (true);
@@ -504,9 +570,11 @@ create policy votes_read_authenticated_results on public.votes
 for select to authenticated using (true);
 
 revoke all on public.students, public.parties, public.candidates, public.votes from anon, authenticated;
+revoke all on public.election_settings from anon, authenticated;
 grant select (id, student_id, lrn, full_name, email, grade_level, section, division, role,
   has_voted, has_agreed_terms, status, created_at) on public.students to authenticated;
 grant update (has_agreed_terms) on public.students to authenticated;
+grant select on public.election_settings to authenticated;
 grant select on public.parties, public.candidates to authenticated;
 grant select (candidate_id, position, created_at) on public.votes to authenticated;
 grant all on public.students, public.parties, public.candidates, public.votes to service_role;
@@ -515,6 +583,8 @@ revoke all on function public.submit_student_ballot(uuid, text, text, jsonb) fro
 grant execute on function public.submit_student_ballot(uuid, text, text, jsonb) to authenticated;
 revoke all on function public.get_my_votes() from public, anon;
 grant execute on function public.get_my_votes() to authenticated;
+revoke all on function public.get_my_election_otp() from public, anon;
+grant execute on function public.get_my_election_otp() to authenticated;
 revoke all on function public.reset_student_vote(text) from public, anon, authenticated;
 grant execute on function public.reset_student_vote(text) to service_role;
 

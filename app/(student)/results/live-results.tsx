@@ -12,11 +12,13 @@ export type ResultCandidate = {
   party_id: string | null;
   party_name: string;
   image_url: string | null;
+  division: "JHS" | "SHS" | "both";
 };
 
 export default function LiveResults({ candidates, initialVotes }: { candidates: ResultCandidate[]; initialVotes: VoteRow[] }) {
   const [votes, setVotes] = useState(initialVotes);
   const [isConnected, setIsConnected] = useState(false);
+  const [division, setDivision] = useState<"JHS" | "SHS">("JHS");
 
   useEffect(() => {
     const supabase = createClient();
@@ -41,7 +43,8 @@ export default function LiveResults({ candidates, initialVotes }: { candidates: 
   }, []);
 
   const positions = new Map<string, ResultCandidate[]>();
-  for (const candidate of candidates) {
+  const visibleCandidates = candidates.filter((candidate) => candidate.division === division || candidate.division === "both");
+  for (const candidate of visibleCandidates) {
     const group = positions.get(candidate.position) ?? [];
     group.push(candidate);
     positions.set(candidate.position, group);
@@ -49,6 +52,9 @@ export default function LiveResults({ candidates, initialVotes }: { candidates: 
 
   return (
     <div className="mt-8">
+      <div role="tablist" aria-label="Results division" className="flex border-b border-[#cfd8d1]">
+        {(["JHS", "SHS"] as const).map((value) => <button key={value} type="button" role="tab" aria-selected={division === value} onClick={() => setDivision(value)} className={`border-b-2 px-4 py-3 text-sm font-semibold ${division === value ? "border-[#005a36] text-[#005a36]" : "border-transparent text-[#66736b]"}`}>{value}</button>)}
+      </div>
       <p className="flex items-center gap-2 text-xs font-semibold text-[#66736b]" aria-live="polite">
         <span aria-hidden="true" className={`size-2 rounded-full ${isConnected ? "bg-[#21824e]" : "bg-[#b99b4a]"}`} />
         {isConnected ? "Live updates connected" : "Connecting to live updates"}

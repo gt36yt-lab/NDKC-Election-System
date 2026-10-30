@@ -1,6 +1,7 @@
 import Image from "next/image";
 import { createClient } from "@/lib/supabase/server";
 import { candidateMatchesGrade, schoolDivision, sortPositions } from "@/lib/position-order";
+import OtpStatus from "../otp-status";
 
 type Candidate = {
   id: string;
@@ -19,10 +20,11 @@ export default async function CandidatesPage() {
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return null;
 
-  const [{ data: student, error: studentError }, { data: candidates, error: candidateError }, { data: parties, error: partyError }] = await Promise.all([
-    supabase.from("students").select("id, student_id, role, grade_level").eq("id", user.id).maybeSingle(),
+  const [{ data: student, error: studentError }, { data: candidates, error: candidateError }, { data: parties, error: partyError }, { data: otpRows, error: otpError }] = await Promise.all([
+    supabase.from("students").select("id, student_id, role, grade_level, has_voted").eq("id", user.id).maybeSingle(),
     supabase.from("candidates").select("id, full_name, position, party_id, platform, image_url, allowed_grade_levels").order("full_name"),
     supabase.from("parties").select("id, name").order("name"),
+    supabase.rpc("get_my_election_otp"),
   ]);
 
   if (studentError) {
@@ -35,6 +37,8 @@ export default async function CandidatesPage() {
 
   if (candidateError) console.error("[CandidatesPage] Candidate lookup failed:", candidateError);
   if (partyError) console.error("[CandidatesPage] Party lookup failed:", partyError);
+  if (otpError) console.error("[CandidatesPage] Election OTP lookup failed:", otpError);
+  const electionOtp = (otpRows ?? [])[0] as { status: "scheduled" | "active" | "ended" | "cancelled"; otp_code: string | null } | undefined;
   const error = candidateError ?? partyError;
   const gradeLevel = Number(student?.grade_level);
   if (!Number.isInteger(gradeLevel) || gradeLevel < 7 || gradeLevel > 12) {
@@ -53,6 +57,7 @@ export default async function CandidatesPage() {
     <main className="page-enter mx-auto max-w-7xl px-5 py-10 sm:px-8 sm:py-14">
       <p className="text-xs font-bold uppercase tracking-[0.18em] text-[#005a36]">Meet the candidates</p>
       <h1 className="display-font mt-3 text-4xl">Candidate profiles</h1>
+      <OtpStatus status={electionOtp?.status} otpCode={electionOtp?.otp_code ?? null} hasVoted={student.has_voted} error={Boolean(otpError)} />
       {error ? (
         <p role="alert" className="mt-8 border-l-2 border-[#b84a3a] bg-white px-4 py-3 text-sm text-[#8c3328]">Candidate information could not be loaded. Please try again later.</p>
       ) : groupedCandidates.size === 0 ? (

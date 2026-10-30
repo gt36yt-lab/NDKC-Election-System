@@ -12,13 +12,16 @@ export async function submitBallot(input: { lrn: string; otp: string; votes: Sub
 
   const { data: student, error: studentError } = await supabase
     .from("students")
-    .select("lrn, grade_level, has_voted, has_agreed_terms")
+    .select("lrn, grade_level, has_voted, has_agreed_terms, status")
     .eq("id", user.id)
     .maybeSingle();
 
   if (studentError || !student) return { error: "Your student profile could not be verified." };
+  if (student.status !== "approved") return { error: "Your account is not approved to vote." };
   if (!student.has_agreed_terms) return { error: "Please accept the election terms before voting." };
   if (student.has_voted) return { error: "Our records show that your ballot has already been submitted." };
+  const { data: electionSettings, error: settingsError } = await supabase.from("election_settings").select("status").eq("id", 1).maybeSingle();
+  if (settingsError || electionSettings?.status !== "active") return { error: "Voting is not currently active." };
   if (!student.lrn || input.lrn.trim() !== student.lrn) return { error: "The Student ID does not match your student account." };
   if (!input.otp.trim()) return { error: "Enter the OTP provided for your ballot." };
   if (input.votes.length === 0) return { error: "Select at least one candidate before continuing." };

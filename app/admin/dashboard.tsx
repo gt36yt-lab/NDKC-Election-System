@@ -2,6 +2,7 @@
 
 import { useMemo, useState } from "react";
 import { RefreshCw, Search } from "lucide-react";
+import Link from "next/link";
 import StudentImport from "./student-import";
 import CandidateManagement from "./candidate-management";
 
@@ -26,11 +27,25 @@ export type AdminCandidate = {
   platform: string | null;
   image_url: string | null;
   allowed_grade_levels: number[] | null;
+  division?: string | null;
+  manifesto?: string | null;
+  photo_url?: string | null;
 };
 
 export type AdminParty = { id: string; name: string; description: string | null };
+export type AdminElectionSettings = { status: "scheduled" | "active" | "ended" | "cancelled"; start_time: string | null; end_time: string | null };
 
-export default function AdminDashboard({ initialStudents, initialCandidates, initialParties, currentAdminId }: { initialStudents: AdminStudent[]; initialCandidates: AdminCandidate[]; initialParties: AdminParty[]; currentAdminId: string }) {
+function toDateTimeInput(value: string | null) {
+  if (!value) return "";
+  const date = new Date(value);
+  return new Date(date.getTime() - date.getTimezoneOffset() * 60_000).toISOString().slice(0, 16);
+}
+
+function fromDateTimeInput(value: FormDataEntryValue | null) {
+  return typeof value === "string" && value ? new Date(value).toISOString() : null;
+}
+
+export default function AdminDashboard({ initialStudents, initialCandidates, initialParties, initialElectionSettings, currentAdminId }: { initialStudents: AdminStudent[]; initialCandidates: AdminCandidate[]; initialParties: AdminParty[]; initialElectionSettings: AdminElectionSettings; currentAdminId: string }) {
   const [students, setStudents] = useState(initialStudents);
   const [query, setQuery] = useState("");
   const [resettingId, setResettingId] = useState<string | null>(null);
@@ -38,10 +53,12 @@ export default function AdminDashboard({ initialStudents, initialCandidates, ini
   const [editError, setEditError] = useState("");
   const [isSavingStudent, setIsSavingStudent] = useState(false);
   const [notice, setNotice] = useState("");
-  const [activeTab, setActiveTab] = useState<"students" | "approvals" | "candidates">("students");
+  const [activeTab, setActiveTab] = useState<"students" | "approvals" | "election" | "candidates">("students");
   const [gradeFilter, setGradeFilter] = useState("all");
   const [sectionFilter, setSectionFilter] = useState("all");
   const [votingStatusFilter, setVotingStatusFilter] = useState("all");
+  const [electionSettings, setElectionSettings] = useState(initialElectionSettings);
+  const [isSavingElectionSettings, setIsSavingElectionSettings] = useState(false);
   const totalVoters = students.length;
   const votedCount = students.filter((student) => student.has_voted).length;
   const turnout = totalVoters === 0 ? 0 : Math.round((votedCount / totalVoters) * 100);
@@ -168,6 +185,55 @@ export default function AdminDashboard({ initialStudents, initialCandidates, ini
     }
   }
 
+  async function saveElectionSettings(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (isSavingElectionSettings) return;
+    const form = new FormData(event.currentTarget);
+    setIsSavingElectionSettings(true);
+    setNotice("");
+    try {
+      const response = await fetch("/api/admin/election-settings", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          status: electionSettings.status,
+          start_time: fromDateTimeInput(form.get("start_time")),
+          end_time: fromDateTimeInput(form.get("end_time")),
+        }),
+      });
+      const result = await response.json() as { settings?: AdminElectionSettings; error?: string };
+      if (!response.ok || !result.settings) throw new Error(result.error ?? "Election schedule could not be saved.");
+      setElectionSettings(result.settings);
+      setNotice("Election schedule saved.");
+    } catch (cause) {
+      setNotice(cause instanceof Error ? cause.message : "Election schedule could not be saved.");
+    } finally {
+      setIsSavingElectionSettings(false);
+    }
+  }
+
+  async function setElectionStatus(status: AdminElectionSettings["status"]) {
+    if (isSavingElectionSettings) return;
+    if (status === "cancelled" && !window.confirm("Cancel this election immediately? Voting will stop.")) return;
+    setIsSavingElectionSettings(true);
+    setNotice("");
+    try {
+      const response = await fetch("/api/admin/election-settings", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ status }),
+      });
+      const result = await response.json() as { settings?: AdminElectionSettings; error?: string };
+      if (!response.ok || !result.settings) throw new Error(result.error ?? "Election status could not be updated.");
+      setElectionSettings(result.settings);
+      setNotice(`Election status set to ${status}.`);
+    } catch (cause) {
+      setNotice(cause instanceof Error ? cause.message : "Election status could not be updated.");
+    } finally {
+      setIsSavingElectionSettings(false);
+    }
+  }
+
   async function saveStudent(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (!editingStudent || isSavingStudent) return;
@@ -235,6 +301,7 @@ export default function AdminDashboard({ initialStudents, initialCandidates, ini
       <div role="tablist" aria-label="Admin sections" className="mt-8 flex border-b border-[#cfd8d1]">
         <button type="button" role="tab" aria-selected={activeTab === "students"} onClick={() => setActiveTab("students")} className={`border-b-2 px-4 py-3 text-sm font-semibold ${activeTab === "students" ? "border-[#005a36] text-[#005a36]" : "border-transparent text-[#66736b]"}`}>Students</button>
         <button type="button" role="tab" aria-selected={activeTab === "approvals"} onClick={() => setActiveTab("approvals")} className={`border-b-2 px-4 py-3 text-sm font-semibold ${activeTab === "approvals" ? "border-[#005a36] text-[#005a36]" : "border-transparent text-[#66736b]"}`}>Pending approvals <span className="ml-1 tabular-nums">{students.filter((student) => student.status === "pending").length}</span></button>
+        <button type="button" role="tab" aria-selected={activeTab === "election"} onClick={() => setActiveTab("election")} className={`border-b-2 px-4 py-3 text-sm font-semibold ${activeTab === "election" ? "border-[#005a36] text-[#005a36]" : "border-transparent text-[#66736b]"}`}>Election control</button>
         <button type="button" role="tab" aria-selected={activeTab === "candidates"} onClick={() => setActiveTab("candidates")} className={`border-b-2 px-4 py-3 text-sm font-semibold ${activeTab === "candidates" ? "border-[#005a36] text-[#005a36]" : "border-transparent text-[#66736b]"}`}>Candidates &amp; parties</button>
       </div>
 
@@ -375,6 +442,15 @@ export default function AdminDashboard({ initialStudents, initialCandidates, ini
             </tbody>
           </table>
         </div>
+      </section> : activeTab === "election" ? <section className="mt-8 max-w-3xl" aria-labelledby="election-control-title">
+        <div className="flex flex-wrap items-center justify-between gap-4 border-b border-[#cfd8d1] pb-4"><div><h2 id="election-control-title" className="display-font text-2xl">Election control panel</h2><p className="mt-1 text-sm text-[#66736b]">Current state: <span className="font-bold uppercase text-[#005a36]">{electionSettings.status}</span></p></div><Link href="/admin/results" className="text-sm font-semibold text-[#005a36] underline">View division results</Link></div>
+        {notice && <p role="status" className="mt-4 border-l-2 border-[#005a36] bg-[#e5f0e9] px-4 py-3 text-sm text-[#174b32]">{notice}</p>}
+        <form onSubmit={(event) => void saveElectionSettings(event)} className="mt-5 grid gap-4 border-y border-[#d9e0db] bg-white/80 p-5 sm:grid-cols-2">
+          <label className="text-sm font-semibold">Voting starts<input name="start_time" type="datetime-local" defaultValue={toDateTimeInput(electionSettings.start_time)} className="mt-2 h-11 w-full border border-[#cfd8d1] bg-white px-3 text-sm" /></label>
+          <label className="text-sm font-semibold">Voting ends<input name="end_time" type="datetime-local" defaultValue={toDateTimeInput(electionSettings.end_time)} className="mt-2 h-11 w-full border border-[#cfd8d1] bg-white px-3 text-sm" /></label>
+          <button type="submit" disabled={isSavingElectionSettings} className="h-11 justify-self-start bg-[#005a36] px-5 text-sm font-bold text-white hover:bg-[#003d28] disabled:opacity-50 sm:col-span-2">{isSavingElectionSettings ? "Saving…" : "Save schedule"}</button>
+        </form>
+        <div className="mt-5 flex flex-wrap gap-3"><button type="button" disabled={isSavingElectionSettings || electionSettings.status === "scheduled"} onClick={() => void setElectionStatus("scheduled")} className="h-11 border border-[#cfd8d1] px-4 text-sm font-semibold hover:border-[#005a36] disabled:opacity-50">Schedule election</button><button type="button" disabled={isSavingElectionSettings || electionSettings.status === "active"} onClick={() => void setElectionStatus("active")} className="h-11 bg-[#005a36] px-4 text-sm font-bold text-white hover:bg-[#003d28] disabled:opacity-50">Start voting</button><button type="button" disabled={isSavingElectionSettings || electionSettings.status !== "active"} onClick={() => void setElectionStatus("ended")} className="h-11 border border-[#cfd8d1] px-4 text-sm font-semibold hover:border-[#005a36] disabled:opacity-50">End voting</button><button type="button" disabled={isSavingElectionSettings || electionSettings.status === "cancelled"} onClick={() => void setElectionStatus("cancelled")} className="h-11 border border-[#b84a3a] px-4 text-sm font-semibold text-[#8c3328] hover:bg-[#fbf0ee] disabled:opacity-50">Emergency cancel</button></div>
       </section> : <CandidateManagement initialCandidates={initialCandidates} initialParties={initialParties} />}
     </main>
   );
