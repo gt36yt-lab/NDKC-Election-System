@@ -636,6 +636,38 @@ grant select on public.parties, public.candidates to authenticated;
 grant select (candidate_id, position, created_at) on public.votes to authenticated;
 grant all on public.students, public.parties, public.candidates, public.votes to service_role;
 
+do $$
+declare
+  table_name text;
+begin
+  if not exists (
+    select 1
+    from pg_publication
+    where pubname = 'supabase_realtime'
+  ) then
+    raise exception 'Supabase Realtime publication is not available.';
+  end if;
+
+  foreach table_name in array array[
+    'students',
+    'candidates',
+    'parties',
+    'election_settings',
+    'votes'
+  ] loop
+    if not exists (
+      select 1
+      from pg_publication_tables
+      where pubname = 'supabase_realtime'
+        and schemaname = 'public'
+        and tablename = table_name
+    ) then
+      execute format('alter publication supabase_realtime add table public.%I', table_name);
+    end if;
+  end loop;
+end;
+$$;
+
 revoke all on function public.submit_student_ballot(uuid, text, text, jsonb) from public, anon;
 grant execute on function public.submit_student_ballot(uuid, text, text, jsonb) to authenticated;
 revoke all on function public.get_my_votes() from public, anon;

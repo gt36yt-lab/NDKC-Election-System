@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Pencil, Plus, Trash2, X } from "lucide-react";
 import Image from "next/image";
 import { comparePositions, POSITION_OPTIONS } from "@/lib/position-order";
@@ -17,6 +17,11 @@ export default function CandidateManagement({ initialCandidates, initialParties 
   const [notice, setNotice] = useState("");
   const [editingCandidate, setEditingCandidate] = useState<AdminCandidate | null>(null);
   const [isCandidateEditorOpen, setIsCandidateEditorOpen] = useState(false);
+
+  useEffect(() => {
+    setCandidates([...initialCandidates].sort((left, right) => comparePositions(left.position, right.position) || left.full_name.localeCompare(right.full_name)));
+    setParties(initialParties);
+  }, [initialCandidates, initialParties]);
 
   function openCandidateEditor(candidate: AdminCandidate | null = null) {
     setEditingCandidate(candidate);

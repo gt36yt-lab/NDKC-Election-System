@@ -21,6 +21,10 @@ export default function LiveResults({ candidates, initialVotes }: { candidates: 
   const [division, setDivision] = useState<"JHS" | "SHS">("JHS");
 
   useEffect(() => {
+    setVotes(initialVotes);
+  }, [initialVotes]);
+
+  useEffect(() => {
     const supabase = createClient();
     let active = true;
     const refreshVotes = async () => {
